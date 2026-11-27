@@ -93,7 +93,9 @@ class PidRequester(BasePidProvider):
             "v2": xml_with_pre.v2,
             "aop_pid": xml_with_pre.aop_pid,
         }
-        registered = PidRequester.get_registration_demand(user, article_proc, xml_with_pre)
+        registered = PidRequester.get_registration_demand(
+            user, article_proc, xml_with_pre, force_update,
+        )
         if registered.get("error_type"):
             return registered
 
@@ -124,7 +126,7 @@ class PidRequester(BasePidProvider):
         return registered
 
     @staticmethod
-    def get_registration_demand(user, article_proc, xml_with_pre):
+    def get_registration_demand(user, article_proc, xml_with_pre, force_update):
         """
         Obtém a indicação de demanda de registro no Upload e/ou Core.
 
@@ -145,6 +147,15 @@ class PidRequester(BasePidProvider):
         # Inicia operação de logging para rastreamento
         op = article_proc.start(user, ">>> get registration demand")
 
+        if force_update:
+            registered = {
+                "force_update": True,
+                "do_remote_registration": True,
+                "do_local_registration": True,
+            }
+            op.finish(user, completed=True, detail=registered)
+            return registered
+
         # Verifica se o XML já está registrado e obtém dados de comparação
         registered = PidProviderXML.is_registered(xml_with_pre)
 
@@ -162,6 +173,14 @@ class PidRequester(BasePidProvider):
             )
             # Upload segue a mesma regra do Core quando XMLs são iguais
             registered["do_local_registration"] = registered["do_remote_registration"]
+        elif registered.get("is_equal_xml"):
+            # XML recebido é igual ao registrado, mas os dados por coleção
+            # (CollectionPidV2) estão incompletos: registra no Upload para
+            # completá-los; no Core, somente se ainda não registrado
+            registered["do_remote_registration"] = not registered.get(
+                "registered_in_core"
+            )
+            registered["do_local_registration"] = True
         else:
             # XML recebido é diferente do registrado ou não está no Upload
             # Força registro em ambos os sistemas
@@ -256,15 +275,15 @@ class PidRequester(BasePidProvider):
                 detail = resp
                 registered.update(resp)
 
-            op.finish(user, completed=True, detail=detail)
+            op.finish(user, completed=not resp.get("error_type"), detail=detail)
             return resp
         except Exception as e:
             logging.exception(e)
-            logging.error(detail)
             exc_type, exc_value, exc_traceback = sys.exc_info()
             op.finish(user, completed=False, exception=e, exc_traceback=exc_traceback)
             return {"error_msg": str(e), "error_type": str(type(e))}
 
+    # OBSOLETO: o pid v2 é corrigido por coleção em proc.models.ArticleProc.fix_pid_v2
     def fix_pid_v2(
         self,
         user,

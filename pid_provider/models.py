@@ -8,9 +8,8 @@ from zlib import crc32
 
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.core.exceptions import FieldError
-from django.db import IntegrityError, models
-from django.db.models import Prefetch, Q, Count
+from django.db import IntegrityError, models, transaction
+from django.db.models import Count, F, Prefetch, Q
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
@@ -31,13 +30,20 @@ from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutu
     profile_staticmethod,
 )
 from pid_provider import choices, exceptions
+from pid_provider.multi_collection import (
+    get_journal_pid_from_v2,
+)
 from pid_provider.query_params import (
     get_data_to_compare,
     zero_to_none,
-    compare,
     QueryBuilderPidProviderXML,
+    fix_get_article_data,
+    fix_get_data_to_compare,
+    fix_xml_with_pre_data,
+    get_best_match,
+    select_record,
 )
-from tracker.models import BaseEvent, UnexpectedEvent
+from tracker.models import UnexpectedEvent
 
 try:
     from django_prometheus.models import ExportModelOperationsMixin
@@ -101,10 +107,23 @@ def xml_directory_path(instance, filename):
     return f"pid_provider/{subdir_sps_pkg_name}/{filename}"
 
 
+def xml_url_zipfile_path(instance, filename):
+    """Mantido porque a migração histórica 0010 referencia este callback."""
+    url_hash = abs(hash(instance.url)) % (10 ** 8)
+    return f"pid_provider/xmlurl/{url_hash}/{filename}"
+
+
 class XMLVersion(CommonControlField):
     """
     Tem função de guardar a versão do XML
+
+    A versão do XML de cada coleção, quando o periódico está em mais de uma
+    coleção, é indicada por CollectionPidV2.current_version
     """
+
+    # registro técnico: o índice de referências do Wagtail (telas de uso do
+    # admin) não se aplica e custa várias consultas a cada gravação
+    wagtail_reference_index_ignore = True
 
     pid_provider_xml = models.ForeignKey(
         "PidProviderXML", null=True, blank=True, on_delete=models.SET_NULL
@@ -130,27 +149,33 @@ class XMLVersion(CommonControlField):
         user,
         pid_provider_xml,
         xml_with_pre,
+        finger_print=None,
     ):
+        # finger_print serializa o XML inteiro: calculado uma única vez
+        finger_print = finger_print or xml_with_pre.finger_print
         try:
             obj = cls()
             obj.pid_provider_xml = pid_provider_xml
-            obj.finger_print = xml_with_pre.finger_print
+            obj.finger_print = finger_print
             obj.creator = user
-            obj.save()
             obj.save_file(
                 f"{pid_provider_xml.v3}.xml", xml_with_pre.tostring(pretty_print=True)
             )
             obj.save()
             return obj
         except IntegrityError:
-            return cls.get(pid_provider_xml, xml_with_pre.finger_print)
+            return cls.get(pid_provider_xml, finger_print)
 
     def save_file(self, filename, content):
-        try:
-            self.file.delete(save=False)
-        except Exception as e:
-            logging.exception(e)
-        self.file.save(filename, ContentFile(content))
+        """
+        Grava o arquivo sem gravar o registro: quem chama grava o registro
+        """
+        if self.file:
+            try:
+                self.file.delete(save=False)
+            except Exception as e:
+                logging.exception(e)
+        self.file.save(filename, ContentFile(content), save=False)
 
     def is_equal_to(self, xml_with_pre):
         return os.path.isfile(self.file.path) and (
@@ -198,8 +223,10 @@ class XMLVersion(CommonControlField):
     @classmethod
     @profile_classmethod
     def get_or_create(cls, user, pid_provider_xml, xml_with_pre):
+        # finger_print serializa o XML inteiro: calculado uma única vez
+        finger_print = xml_with_pre.finger_print
         try:
-            latest = cls.get(pid_provider_xml, xml_with_pre.finger_print)
+            latest = cls.get(pid_provider_xml, finger_print)
             try:
                 file_exist = os.path.isfile(latest.file.path)
             except (AttributeError, TypeError, ValueError) as e:
@@ -217,6 +244,7 @@ class XMLVersion(CommonControlField):
                 user=user,
                 pid_provider_xml=pid_provider_xml,
                 xml_with_pre=xml_with_pre,
+                finger_print=finger_print,
             )
 
 
@@ -284,6 +312,10 @@ class OtherPid(CommonControlField):
     Registro de PIDs (associados a um PidProviderXML) cujo valor difere do valor atribuído
     """
 
+    # registro técnico: o índice de referências do Wagtail (telas de uso do
+    # admin) não se aplica e custa várias consultas a cada gravação
+    wagtail_reference_index_ignore = True
+
     pid_provider_xml = ParentalKey(
         "PidProviderXML",
         null=True,
@@ -317,7 +349,9 @@ class OtherPid(CommonControlField):
     @classmethod
     @profile_classmethod
     def get_or_create(cls, pid_type, pid_in_xml, version, user, pid_provider_xml):
-        if pid_in_xml and pid_type and version and user and pid_provider_xml:
+        # version é opcional:
+        # PidProviderXML.current_version fica vazio (ver CollectionPidV2)
+        if pid_in_xml and pid_type and user and pid_provider_xml:
             try:
                 obj = cls.objects.get(
                     pid_provider_xml=pid_provider_xml,
@@ -336,12 +370,330 @@ class OtherPid(CommonControlField):
 
             return obj
         raise ValueError(
-            f"OtherPid.get_or_create requires pid_in_xml ({pid_in_xml}) and pid_type ({pid_type}) and version ({version}) and user ({user}) and pid_provider_xml ({pid_provider_xml})"
+            f"OtherPid.get_or_create requires pid_in_xml ({pid_in_xml}) and pid_type ({pid_type}) and user ({user}) and pid_provider_xml ({pid_provider_xml})"
         )
 
     @property
     def created_updated(self):
         return self.updated or self.created
+
+
+class CollectionPidV2(CommonControlField):
+    """
+    Registro do PID v2 e da versão do XML do documento em cada coleção,
+    quando o periódico está em mais de uma coleção.
+
+    Um mesmo periódico pode estar em mais de uma coleção com PIDs
+    (issn_scielo) e/ou acrônimos diferentes e, consequentemente, seus
+    artigos têm PIDs v2 e XML diferentes em cada coleção.
+    Ex.: Psicologia USP
+    - scl: S0103-65642009000300003
+    - psi: S1678-51772009000300003
+
+    PidProviderXML.v2 e PidProviderXML.current_version mantêm os
+    dados da única coleção do documento, seja nacional, temática ou
+    independente, ou, se o documento está em mais de uma coleção, os da
+    coleção nacional, e nunca ficam vazios (ver
+    PidProviderXML.updates_current_version e
+    PidProviderXML.add_collections). Não são alterados pelas migrações:
+    documentos registrados antes de CollectionPidV2 são completados ao
+    serem reprocessados.
+
+    Para obter a versão / pid v2 de uma coleção, preferir CollectionPidV2
+    (ver get_current_version).
+    """
+
+    # registro técnico: o índice de referências do Wagtail (telas de uso do
+    # admin) não se aplica e custa várias consultas a cada gravação
+    wagtail_reference_index_ignore = True
+
+    pid_provider_xml = ParentalKey(
+        "PidProviderXML",
+        on_delete=models.CASCADE,
+        related_name="collection_pids_v2",
+    )
+    collection = models.ForeignKey(
+        Collection, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    pid_v2 = models.CharField(_("v2"), max_length=24, null=True, blank=True)
+    journal_acron = models.CharField(
+        _("Journal acronym"), max_length=25, null=True, blank=True
+    )
+    # versão atual do XML recebido desta coleção
+    current_version = models.ForeignKey(
+        XMLVersion, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    # nome do pacote SPS obtido de current_version
+    sps_pkg_name = models.CharField(
+        _("SPS package name"), max_length=100, null=True, blank=True
+    )
+
+    panels = [
+        FieldPanel("collection", read_only=True),
+        FieldPanel("journal_acron", read_only=True),
+        FieldPanel("pid_v2", read_only=True),
+        FieldPanel("sps_pkg_name", read_only=True),
+        AutocompletePanel("current_version", read_only=True),
+    ]
+
+    class Meta:
+        unique_together = [("pid_provider_xml", "collection")]
+        indexes = [
+            models.Index(fields=["pid_v2"]),
+            models.Index(fields=["sps_pkg_name"], name="pid_provide_sps_pkg_8e5c4f_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.collection} {self.journal_acron} {self.pid_v2}"
+
+    def set_sps_pkg_name(self, raise_error=True, xml_with_pre=None):
+        """
+        Obtém sps_pkg_name, para identificação humana, construído a partir
+        de current_version.xml_with_pre, que é a versão do XML de
+        pid_provider_xml na coleção.
+
+        Não usa xml_with_pre.sps_pkg_name, que prioriza o nome do arquivo,
+        que, em XMLVersion, é o pid v3 (chave determinística).
+
+        build_sps_pkg_name depende de vários dados do XML e levanta
+        ValueError na falta deles; neste caso mantém o nome atual
+        (ex.: copiado de SPSPkg), exceto se for o pid v3.
+
+        xml_with_pre: XML de current_version já em memória (ex.: no
+        registro), evita ler e analisar novamente o arquivo da versão
+        """
+        if not self.current_version:
+            return
+        try:
+            xml_with_pre = xml_with_pre or self.current_version.xml_with_pre
+            self.sps_pkg_name = xml_with_pre.build_sps_pkg_name() or None
+        except Exception as e:
+            if self.sps_pkg_name and self.sps_pkg_name == self.pid_provider_xml.v3:
+                self.sps_pkg_name = None
+            if raise_error:
+                raise
+            logging.exception(e)
+
+    @classmethod
+    def get_ids_to_complete_sps_pkg_name(cls, force_update=False):
+        """
+        Ids dos registros cujo sps_pkg_name deve ser obtido de current_version
+        """
+        items = cls.objects.filter(current_version__isnull=False)
+        if not force_update:
+            # sem nome ou com o pid v3 no lugar do nome do pacote
+            items = items.filter(
+                Q(sps_pkg_name__isnull=True)
+                | Q(sps_pkg_name=F("pid_provider_xml__v3"))
+            )
+        return items.order_by("id").values_list("id", flat=True)
+
+    @classmethod
+    def complete_sps_pkg_name(cls, user, ids):
+        """
+        Preenche sps_pkg_name dos registros (ids) a partir de
+        current_version.xml_with_pre.build_sps_pkg_name()
+
+        A leitura do XML é lenta, por isso é feita por lotes de ids
+        (ver task_complete_collection_pid_v2_sps_pkg_name)
+        """
+        items = cls.objects.filter(id__in=ids, current_version__isnull=False)
+        result = {"updated": 0, "failed": 0}
+        for item in items.select_related("current_version").iterator():
+            try:
+                item.set_sps_pkg_name()
+                item.updated_by = user
+                item.save(update_fields=["sps_pkg_name", "updated_by", "updated"])
+                result["updated"] += 1
+            except Exception as e:
+                result["failed"] += 1
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                UnexpectedEvent.create(
+                    exception=e,
+                    exc_traceback=exc_traceback,
+                    detail={
+                        "operation": "CollectionPidV2.complete_sps_pkg_name",
+                        "collection_pid_v2_id": item.id,
+                        "pid_v2": item.pid_v2,
+                    },
+                )
+        return result
+
+    @staticmethod
+    def is_equal_to(pid_provider_xml, xml_with_pre, collection_acron=None):
+        """
+        Compara o XML com a versão registrada da coleção do XML
+        (collection_acron, na falta, a coleção de origem do XML)
+        """
+        collection_acron = collection_acron or xml_with_pre.collection
+        if not pid_provider_xml or not pid_provider_xml.pk or not collection_acron:
+            return False
+        item = (
+            pid_provider_xml.collection_pids_v2.filter(
+                collection__acron=collection_acron, current_version__isnull=False
+            )
+            .select_related("current_version")
+            .first()
+        )
+        return bool(item and item.current_version.is_equal_to(xml_with_pre))
+
+    @property
+    def journal_pid(self):
+        # ISSN adotado como PID do periódico na coleção (issn_scielo)
+        return get_journal_pid_from_v2(self.pid_v2)
+
+    @classmethod
+    def get(cls, pid_provider_xml, collection):
+        return cls.objects.get(pid_provider_xml=pid_provider_xml, collection=collection)
+
+    @classmethod
+    def get_or_create(
+        cls, user, pid_provider_xml_id, collection, pid_v2=None, journal_acron=None
+    ):
+        """
+        Obtém ou cria o registro do documento na coleção, para vincular o
+        pacote (SPSPkg) e o artigo (Article) da coleção
+
+        Não altera o registro existente; current_version é completado no
+        registro do XML da coleção (ver PidProviderXML.add_collections)
+        """
+        if not (user and pid_provider_xml_id and collection):
+            raise ValueError(
+                f"CollectionPidV2.get_or_create requires user ({user}) and pid_provider_xml_id ({pid_provider_xml_id}) and collection ({collection})"
+            )
+        params = dict(pid_provider_xml_id=pid_provider_xml_id, collection=collection)
+        try:
+            return cls.objects.get(**params)
+        except cls.DoesNotExist:
+            try:
+                with transaction.atomic():
+                    return cls.objects.create(
+                        creator=user,
+                        pid_v2=pid_v2,
+                        journal_acron=journal_acron,
+                        **params,
+                    )
+            except IntegrityError:
+                return cls.objects.get(**params)
+
+    @classmethod
+    def create(
+        cls,
+        user,
+        pid_provider_xml,
+        collection,
+        pid_v2,
+        journal_acron=None,
+        current_version=None,
+        xml_with_pre=None,
+    ):
+        try:
+            obj = cls()
+            obj.pid_v2 = pid_v2
+            obj.journal_acron = journal_acron
+            obj.creator = user
+            obj.pid_provider_xml = pid_provider_xml
+            obj.collection = collection
+            obj.current_version = current_version
+            obj.set_sps_pkg_name(raise_error=False, xml_with_pre=xml_with_pre)
+            obj.save()
+            return obj
+        except IntegrityError:
+            return cls.get(pid_provider_xml, collection)
+    
+    @classmethod
+    @profile_classmethod
+    def create_or_update(
+        cls,
+        user,
+        pid_provider_xml,
+        collection,
+        pid_v2,
+        journal_acron=None,
+        current_version=None,
+        xml_with_pre=None,
+        obj=None,
+    ):
+        """
+        xml_with_pre: XML de current_version já em memória (ver
+        set_sps_pkg_name)
+        obj: registro (pid_provider_xml, collection) já obtido, se existe
+        """
+        # journal_acron é o do XML, que pode não o informar
+        if not (user and pid_provider_xml and collection and pid_v2 and current_version):
+            raise ValueError(
+                f"CollectionPidV2.create_or_update requires user ({user}) and pid_provider_xml ({pid_provider_xml}) and collection ({collection}) and pid_v2 ({pid_v2}) and current_version ({current_version})"
+            )
+        try:
+            obj = obj or cls.get(pid_provider_xml, collection)
+            obj.pid_v2 = pid_v2
+            obj.journal_acron = journal_acron
+            obj.updated_by = user
+            obj.current_version = current_version
+            obj.set_sps_pkg_name(raise_error=False, xml_with_pre=xml_with_pre)
+            obj.save()
+            return obj
+        except cls.DoesNotExist:
+            return cls.create(
+                user,
+                pid_provider_xml,
+                collection,
+                pid_v2,
+                journal_acron,
+                current_version,
+                xml_with_pre,
+            )
+
+    @staticmethod
+    def get_current_version(pid_provider_xml, collection=None, collection_acron=None):
+        """
+        Retorna a versão atual do XML da coleção solicitada ou, se a coleção
+        não foi fornecida, PidProviderXML.current_version (ver
+        PidProviderXML.updates_current_version)
+
+        Fallbacks:
+          - sem coleção: na falta de PidProviderXML.current_version, a
+            versão registrada mais recentemente em CollectionPidV2
+          - com coleção: documento registrado antes de CollectionPidV2
+            (nenhuma versão por coleção) usa PidProviderXML.current_version,
+            até ser reprocessado
+        """
+        if not pid_provider_xml:
+            return
+        if not pid_provider_xml.pk:
+            if collection or collection_acron:
+                return
+            return pid_provider_xml.current_version
+
+        versions = pid_provider_xml.collection_pids_v2.filter(
+            current_version__isnull=False
+        ).select_related("current_version")
+
+        if not collection and not collection_acron:
+            if pid_provider_xml.current_version:
+                return pid_provider_xml.current_version
+            item = versions.order_by("-updated", "-created").first()
+            return item and item.current_version
+
+        if collection:
+            item = versions.filter(collection=collection).first()
+        else:
+            item = versions.filter(collection__acron=collection_acron).first()
+        if item:
+            return item.current_version
+        if not versions.exists():
+            # registrado antes de CollectionPidV2
+            return pid_provider_xml.current_version
+        return None
+
+    @property
+    def data(self):
+        return {
+            "pid_v2": self.pid_v2,
+            "journal_acron": self.journal_acron,
+            "collection_acron": self.collection and self.collection.acron,
+            "is_main": bool(self.collection and self.collection.is_national_journal_collection),
+        }
 
 
 class PidProviderXMLManager(models.Manager):
@@ -367,6 +719,10 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     Tem responsabilidade de garantir a atribuição do PID da versão 3,
     armazenando dados chaves que garantem a identificação do XML
     """
+
+    # registro técnico: o índice de referências do Wagtail (telas de uso do
+    # admin) não se aplica e custa várias consultas a cada gravação
+    wagtail_reference_index_ignore = True
 
     proc_status = models.CharField(
         _("processing status"),
@@ -445,7 +801,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
 
     panel_a = [
         FieldPanel("proc_status"),
-        FieldPanel("collections", read_only=True),
         FieldPanel("issn_electronic", read_only=True),
         FieldPanel("issn_print", read_only=True),
         FieldPanel("pub_year", read_only=True),
@@ -458,9 +813,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         FieldPanel("registered_in_core", read_only=True),
     ]
     panel_b = [
-        AutocompletePanel("collections", read_only=True),
         AutocompletePanel("current_version", read_only=True),
         InlinePanel("other_pid", label=_("Other PID")),
+        InlinePanel("collection_pids_v2", label=_("PID v2 by collection")),
     ]
     panel_c = [
         FieldPanel("z_surnames", read_only=True),
@@ -590,6 +945,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @classmethod
     def delete_queryset(cls, qs):
         OtherPid.objects.filter(pid_provider_xml__in=qs).delete()
+        CollectionPidV2.objects.filter(pid_provider_xml__in=qs).delete()
         qs.delete()
 
     @classmethod
@@ -597,15 +953,41 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     def public_items(cls, from_date):
         now = datetime.utcnow().isoformat()[:10]
         # select_related("current_version") já vem do manager
+        # documento pode ter somente a versão de uma coleção
+        # (ver CollectionPidV2.get_current_version)
         return cls.objects.filter(
             (Q(available_since__isnull=True) | Q(available_since__lte=now))
-            & (Q(created__gte=from_date) | Q(updated__gte=from_date)),
-            current_version__pid_provider_xml__v3__isnull=False,
-        ).iterator()
+            & (Q(created__gte=from_date) | Q(updated__gte=from_date))
+            & (
+                Q(current_version__isnull=False)
+                | Q(collection_pids_v2__current_version__isnull=False)
+            ),
+            v3__isnull=False,
+        ).distinct().iterator()
 
     @property
     def created_updated(self):
         return self.updated or self.created
+
+    @property
+    def collection_pids_v2_data(self):
+        return [
+            item.data
+            for item in self.collection_pids_v2.select_related("collection")
+        ]
+
+    @property
+    def pid_v2_list(self):
+        """
+        Retorna os pids v2 do documento: self.v2 seguido
+        dos pids v2 do documento nas demais coleções
+        """
+        items = [self.v2]
+        if self.pk:
+            items.extend(
+                self.collection_pids_v2.values_list("pid_v2", flat=True)
+            )
+        return list(dict.fromkeys(item for item in items if item))
 
     @property
     @profile_property
@@ -616,21 +998,44 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             "v2": self.v2,
             "aop_pid": self.aop_pid,
             "pkg_name": self.pkg_name,
-            "finger_print": self.current_version and self.current_version.finger_print,
-            "created": self.created and self.created.isoformat(),
-            "updated": self.updated and self.updated.isoformat(),
-            "record_status": "updated" if self.updated else "created",
             "registered_in_core": self.registered_in_core,
+            "collection_pids_v2": self.collection_pids_v2_data,
         }
-        _data.update(self.get_readable_data())
+        _data["registered_data"] = self.get_readable_data()
+        _data.update(self.record_status)
         return _data
+
+    @property
+    def record_status(self):
+        """Retorna os timestamps e o estado do registro ('created' ou 'updated').
+        Calcula a variação entre `created` e `updated` para definir o estado de
+        persistência. Utilizado para direcionar o código HTTP de resposta:
+        - 'created' -> 201 Created
+        - 'updated' -> 200 OK ou 204 No Content
+        Returns:
+            dict: Dicionário com `created`, `updated` em ISO 8601 e `record_status`.
+        """
+        d = {}
+        if self.created:
+            d["created"] = self.created.isoformat()
+            d["record_status"] = "created"
+            if self.updated:
+                d["updated"] = self.updated.isoformat()
+                if (self.updated - self.created).total_seconds() > 1:
+                    d["record_status"] = "updated"
+        return d
 
     @classmethod
     @profile_classmethod
-    def get_xml_with_pre(cls, v3):
+    def get_xml_with_pre(cls, v3, collection=None, collection_acron=None):
+        """
+        Retorna o XML da versão atual da coleção ou, sem a coleção, o de
+        current_version
+        (ver CollectionPidV2.get_current_version)
+        """
         try:
             # select_related("current_version") já vem do manager
-            return cls.objects.get(v3=v3).xml_with_pre
+            return cls.objects.get(v3=v3).get_current_version(collection, collection_acron).xml_with_pre
         except cls.DoesNotExist:
             return None
         except Exception:
@@ -640,7 +1045,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     @profile_property
     def xml_with_pre(self):
         try:
-            return self.current_version.xml_with_pre
+            # current_version ou, na falta, a versão mais recente
+            # (ver get_current_version)
+            return self.get_current_version().xml_with_pre
         except Exception as e:
             logging.exception(e)
             if self.proc_status != choices.PPXML_STATUS_INVALID:
@@ -663,7 +1070,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         if not readable:
             xml_with_pre = self.xml_with_pre
             if xml_with_pre:
-                readable = xml_with_pre.readable_data
+                readable = fix_get_article_data(xml_with_pre)
 
         if readable != self.readable_data:
             self.readable_data = readable
@@ -683,21 +1090,27 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         data = {}
         readable = self.get_readable_data()
         if readable:
-            for field in ("article_titles", "body_fragment", "surnames"):
-                if readable.get(field):
-                    data[field] = readable[field]
+            titles = readable.get("article_titles")
+            body_fragment = readable.get("body_fragment")
+            surnames = readable.get("surnames")
+            if titles:
+                data["article_titles"] = titles
+            if body_fragment:
+                data["body_fragment"] = body_fragment
+            if surnames:
+                data["surnames"] = surnames
         else:
-            # Sem texto legível, o PID v2 ajuda a distinguir hashes coincidentes.
-            data["pid_v2"] = self.v2
-
+            # caso xml esteja ilegível
+            # usar pid_v2 para reduzir a disambiguidade, pois sem
+            # article_titles, body_fragment, surnames pode ser insuficiente
+            # lista, pois o documento pode ter pid v2 diferente em cada coleção
+            data["pid_v2"] = self.pid_v2_list or None
         data.update({
             "z_surnames": self.z_surnames,
             "z_collab": self.z_collab,
             "z_links": self.z_links,
-            # A coluna legada também armazena fingerprints nas versões atuais.
             "body_fragment_fingerprint": self.z_partial_body,
         })
-
         return data
 
     @classmethod
@@ -758,6 +1171,13 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             ISSN obrigatório ausente
         NotEnoughParametersToGetPidProviderXMLError
             Parâmetros insuficientes para identificar documento
+
+        Notes
+        -----
+        Gravação em `PidProviderXMLRegistration`: por padrão, só ocorre se houver
+        erro (`error_type`) ou ambiguidade (`matched_items`), prevenindo inchaço
+        da tabela em fluxos limpos. Esse comportamento pode ser alterado no
+        Wagtail Admin em Configurações > Pid Provider Setting (`record_all_registration_events`).
         """
         try:
             # outputs
@@ -772,9 +1192,22 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             input_data = None
             xml_adapter_data = None
 
-            input_data = {}
-            input_data.update(xml_with_pre.data)
-            input_data.update(xml_with_pre.readable_data)
+            input_data = fix_xml_with_pre_data(xml_with_pre)
+            # xml_with_pre.collection já completada (ver BasePidProvider);
+            # o XML representa somente o documento desta coleção
+            if not xml_with_pre.collection:
+                raise exceptions.RequiredCollectionErrorToGetPidProviderXMLError(
+                    "Unable to identify collection from XML. Please provide collection_acron or ensure XML has valid collection information."
+                )
+            collection = cls.get_xml_collection(xml_with_pre)
+            if not collection:
+                raise exceptions.XMLCollectionNotFoundErrorToGetPidProviderXMLError(
+                    f"Collection not found: {xml_with_pre.collection}"
+                )
+
+            # fragmento do corpo etc.: calculados uma vez (ver _add_data)
+            readable_data = fix_get_article_data(xml_with_pre)
+            input_data.update(readable_data)
             input_data["origin"] = origin
             response["input_data"] = input_data
 
@@ -786,19 +1219,18 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             # consulta se documento já está registrado
             try:
                 records = cls.select_records(xml_adapter)
-                select_record_response = cls.select_record(xml_adapter, records)
+                select_record_response = select_record(xml_adapter, records)
                 if select_record_response.get("multiple_matched_items"):
                     raise cls.MultipleObjectsReturned
-                if (
-                    select_record_response.get("matched_items")
-                    or select_record_response.get("unmatched_items")
-                ):
+                matched_items = select_record_response.get("matched_items")
+                unmatched_items = select_record_response.get("unmatched_items")
+                if matched_items or unmatched_items:
                     response["select_record_response"] = select_record_response
                 try:
                     registered = select_record_response.pop("registered")
+                    event_status = "updated"
                 except KeyError:
                     raise cls.DoesNotExist
-                event_status = "updated"
             except cls.DoesNotExist as exc:
                 registered = None
                 event_status = "created"
@@ -806,7 +1238,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 event_status = "multiple"
                 response["select_record_response"] = select_record_response
                 raise exceptions.QueryDocumentMultipleObjectsReturnedError(exc)
-            except exceptions.UnmatchedPidProviderXMLError:
+            except exceptions.UnmatchedPidProviderXMLError as exc:
                 event_status = "unmatched"
                 response["select_record_response"] = select_record_response
                 raise
@@ -828,7 +1260,6 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             except PidProviderXMLPidV3ConflictError as exc:
                 event_status = "conflict"
                 raise exc
-
             # analisa se continua o registro
             try:
                 PidProviderXML.is_updated(
@@ -837,17 +1268,25 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                     force_update,
                     origin_date,
                     registered_in_core,
+                    collection,
                 )
-                registered = cls._save(
-                    registered,
-                    xml_adapter,
-                    user,
-                    origin_date,
-                    available_since,
-                    registered_in_core,
-                )
+                # evita registro parcial (ex.: PidProviderXML.v2
+                # gravado sem o CollectionPidV2) em caso de falha
+                with transaction.atomic():
+                    registered = cls._save(
+                        registered,
+                        xml_adapter,
+                        user,
+                        origin_date,
+                        available_since,
+                        registered_in_core,
+                        collection,
+                        readable_data,
+                    )
                 # data to return
                 response.update(registered.data)
+                # garante que o valor de v2 seja o da entrada, da coleção processada, e não PidProviderXML.v2 (que pode ser diferente)
+                response["v2"] = xml_with_pre.v2
             except exceptions.ForbiddenPidProviderXMLRegistrationError:
                 event_status = "forbidden"
                 raise
@@ -855,6 +1294,8 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 event_status = "skipped"
                 response["skipped"] = True
                 response.update(registered.data)
+                # garante que o valor de v2 seja o da entrada, da coleção processada, e não PidProviderXML.v2 (que pode ser diferente)
+                response["v2"] = xml_with_pre.v2
                 # do not raise
         except Exception as exc:
             event_status = event_status or "error"
@@ -867,10 +1308,14 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             })
         finally:
             response["event_status"] = event_status
-            record_all = PidProviderSetting.load().record_all_registration_events
-            selection = select_record_response or {}
-            candidates = selection.get("matched_items") or selection.get("unmatched_items")
-            if record_all or error_type or candidates:
+            select_record_response = select_record_response or {}
+            select_records = select_record_response.get("matched_items") or select_record_response.get("unmatched_items")
+            # consulta a configuração somente se o evento não exige gravação
+            if (
+                error_type
+                or select_records
+                or PidProviderSetting.load().record_all_registration_events
+            ):
                 PidProviderXMLRegistration.record(
                     user=user,
                     pid_provider_xml=registered,
@@ -900,15 +1345,18 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             registered_pid=registered and registered.v3,
             auto_solve_pid_conflict=auto_solve_pid_conflict,
         )
-
         if valid_pid != xml_with_pre.v3:
             xml_with_pre.v3 = valid_pid
             xml_changed["pid_v3"] = valid_pid
 
         if registered:
-            if not xml_with_pre.v2 and registered.v2:
-                xml_with_pre.v2 = registered.v2
-                xml_changed["pid_v2"] = registered.v2
+            if not xml_with_pre.v2:
+                # pid v2 da coleção do XML, não necessariamente
+                # PidProviderXML.v2 (ver get_pid_v2)
+                registered_v2 = registered.get_pid_v2(xml_with_pre.collection)
+                if registered_v2:
+                    xml_with_pre.v2 = registered_v2
+                    xml_changed["pid_v2"] = registered_v2
             if not xml_with_pre.aop_pid and registered.aop_pid:
                 xml_with_pre.aop_pid = registered.aop_pid
                 xml_changed["aop_pid"] = registered.aop_pid
@@ -952,6 +1400,8 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         origin_date=None,
         available_since=None,
         registered_in_core=None,
+        collection=None,
+        readable_data=None,
     ):
         if registered:
             registered_changed = registered.check_registered_pids_changed(
@@ -965,47 +1415,199 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
  
         registered.proc_status = choices.PPXML_STATUS_TODO
         registered._add_dates(xml_adapter, origin_date, available_since)
-        registered._add_data(xml_adapter, registered_in_core)
+        registered._add_data(xml_adapter, registered_in_core, readable_data)
         registered._add_journal(xml_adapter)
         registered._add_issue(xml_adapter)
- 
         registered.save()
- 
+
         if registered_changed:
             registered._add_other_pid(registered_changed, user)
-        registered._add_current_version(xml_adapter.xml_with_pre, user)
- 
-        registered.add_collections(xml_adapter)
+
+        registered.add_collections(user, xml_adapter, collection)
         return registered
 
-    def add_collections(self, xml_adapter):
-        q = Q()
-        issn_print = xml_adapter.journal_issn_print
-        issn_electronic = xml_adapter.journal_issn_electronic
+    @staticmethod
+    def get_xml_collection(xml_with_pre):
+        """
+        Coleção do XML (xml_with_pre.collection); o XML representa somente
+        o documento desta coleção
+        """
+        if not xml_with_pre.collection:
+            return None
+        return Collection.objects.filter(acron=xml_with_pre.collection).first()
 
-        try:
-            Collection.objects.filter(scielojournal__isnull=True).exists()
-            issn_path = "scielojournal__journal__official"
-        except FieldError:
-            issn_path = "journalproc__journal__official_journal"
+    def get_current_version(self, collection=None, collection_acron=None):
+        """
+        Retorna a versão atual do XML da coleção ou, sem a coleção,
+        current_version
+        (ver CollectionPidV2.get_current_version)
+        """
+        return CollectionPidV2.get_current_version(self, collection, collection_acron)
 
-        if issn_print:
-            q |= Q(**{f"{issn_path}__issn_print": issn_print})
-        if issn_electronic:
-            q |= Q(**{f"{issn_path}__issn_electronic": issn_electronic})
+    def get_pid_v2(self, collection_acron=None):
+        """
+        Retorna o pid v2 do documento na coleção ou, na falta da coleção,
+        self.v2
 
-        for collection in Collection.objects.filter(q):
+        Documento registrado antes de CollectionPidV2: self.v2 é de uma
+        coleção desconhecida, então é retornado se não pertence a outra
+        coleção
+        """
+        if not collection_acron or not self.pk:
+            return self.v2
+        pids_v2 = dict(
+            self.collection_pids_v2.values_list("collection__acron", "pid_v2")
+        )
+        if pids_v2.get(collection_acron):
+            return pids_v2[collection_acron]
+        if self.v2 not in pids_v2.values():
+            return self.v2
+        return None
+
+    def get_reasons_to_update(self, xml_with_pre, collection):
+        """
+        Motivos para registrar novamente um XML idêntico ao registrado:
+        dados da coleção do XML incompletos ou divergentes, por exemplo, de
+        documentos registrados antes de CollectionPidV2
+
+        Considera somente a coleção do XML (collection, a de
+        xml_with_pre.collection): o XML de uma coleção não completa os
+        dados de outra
+
+        Returns
+        -------
+        list of str
+            vazia se não há o que completar
+        """
+        if not self.pk or not collection:
+            return []
+
+        reasons = []
+        if not self.collections.filter(id=collection.id).exists():
+            reasons.append("missing_xml_collection")
+
+        item = (
+            self.collection_pids_v2.filter(
+                collection=collection,
+                current_version__isnull=False,
+            )
+            .first()
+        )
+        if item and xml_with_pre.v2 and item.pid_v2 != xml_with_pre.v2:
+            reasons.append("collection_pid_v2_differs")
+
+        # PidProviderXML.v2 e .current_version não podem estar vazios
+        # (ver updates_current_version)
+        if xml_with_pre.v2 and not self.v2:
+            reasons.append("missing_v2")
+        if not self.current_version_id:
+            reasons.append("missing_current_version")
+        if (
+            item
+            and self.updates_current_version(collection)
+            and (
+                self.current_version_id != item.current_version_id
+                or (xml_with_pre.v2 and self.v2 != xml_with_pre.v2)
+            )
+        ):
+            reasons.append("current_version_differs")
+        return reasons
+
+    def updates_current_version(self, collection):
+        """
+        Indica se o XML da coleção atualiza PidProviderXML.v2 e
+        PidProviderXML.current_version:
+          - documento em uma única coleção: esta coleção, seja nacional,
+            temática ou independente
+          - documento em mais de uma coleção: a coleção nacional
+            (Collection.is_national_journal_collection)
+
+        Fora destes casos, o XML somente os completa, se vazios
+        """
+        if not collection:
+            return False
+        if collection.is_national_journal_collection:
+            return True
+        if not self.pk:
+            return True
+        # única: nenhuma versão registrada de outra coleção
+        return not (
+            self.collection_pids_v2.filter(current_version__isnull=False)
+            .exclude(collection=collection)
+            .exists()
+        )
+
+    def add_collections(self, user, xml_adapter, collection):
+        """
+        Adiciona a coleção do XML (collection, a de xml_with_pre.collection)
+        e registra o pid v2 e a versão do XML desta coleção (CollectionPidV2)
+
+        Trabalha somente com a coleção do XML: os dados das demais coleções
+        do documento são atualizados quando o XML delas for registrado
+
+        PidProviderXML.v2 e PidProviderXML.current_version nunca ficam
+        vazios (ver updates_current_version):
+          - documento em uma única coleção: o XML dela os atualiza
+          - documento em mais de uma coleção: o XML da coleção nacional os
+            atualiza; o das demais somente os completa, se vazios
+
+        Para obter a versão / pid v2 de uma coleção, usar CollectionPidV2
+        (ver get_current_version)
+        """
+        xml_with_pre = xml_adapter.xml_with_pre
+
+        version = None
+        updates_current_version = False
+        if collection:
             self.collections.add(collection)
+            updates_current_version = self.updates_current_version(collection)
+            # registro da coleção: obtido uma vez (ver create_or_update)
+            collection_pid_v2 = self.collection_pids_v2.filter(
+                collection=collection
+            ).first()
+            version = XMLVersion.get_or_create(user, self, xml_with_pre)
+            CollectionPidV2.create_or_update(
+                user,
+                self,
+                collection,
+                xml_with_pre.v2,
+                # o XML é o da coleção: o acrônimo do periódico é o do XML
+                journal_acron=xml_with_pre.journal_acron,
+                current_version=version,
+                xml_with_pre=xml_with_pre,
+                obj=collection_pid_v2,
+            )
+
+        changed = False
+        if xml_with_pre.v2 and (updates_current_version or not self.v2):
+            self.v2 = xml_with_pre.v2
+            changed = True
+        if updates_current_version or not self.current_version_id:
+            self.current_version = version or XMLVersion.get_or_create(
+                user, self, xml_with_pre
+            )
+            changed = True
+        if changed:
+            self.save()
 
     @staticmethod
     def is_updated(
-        xml_with_pre, registered, force_update, origin_date, registered_in_core
+        xml_with_pre,
+        registered,
+        force_update,
+        origin_date,
+        registered_in_core,
+        collection=None,
     ):
         """
         XML é versão AOP, mas
         documento está registrado com versão VoR (fascículo),
         então, recusar o registro,
         pois está tentando registrar uma versão desatualizada
+
+        XML idêntico ao registrado não é registrado novamente, exceto se
+        os dados da coleção do XML estão incompletos ou divergentes
+        (ver get_reasons_to_update; requer collection)
         """
         if force_update:
             logging.info(f"Do not skip update: force_update")
@@ -1021,8 +1623,21 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             )
             return
 
+        if not registered.readable_data:
+            return
+
         # verifica se é necessário atualizar
-        if registered.is_equal_to(xml_with_pre):
+        # compara com a versão da mesma coleção
+        if registered.is_equal_to(xml_with_pre, xml_with_pre.collection):
+            reasons = (
+                registered.get_reasons_to_update(xml_with_pre, collection)
+                if collection
+                else None
+            )
+            if reasons:
+                # XML igual ao registrado, mas dados por coleção incompletos
+                logging.info(f"Do not skip update: equal, but {reasons}")
+                return
             # XML fornecido é igual ao registrado, não precisa continuar
             logging.info(f"Skip update: equal")
             raise exceptions.SkipSavePidProviderXML
@@ -1044,84 +1659,60 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
             raise exceptions.SkipSavePidProviderXML
 
     @profile_method
-    def is_equal_to(self, xml_with_pre):
-        return bool(
-            self.current_version and self.current_version.is_equal_to(xml_with_pre)
-        )
+    def is_equal_to(self, xml_with_pre, collection_acron=None):
+        return CollectionPidV2.is_equal_to(self, xml_with_pre, collection_acron)
 
     @classmethod
     @profile_classmethod
     def select_records(cls, xml_adapter):
-        """Materializa cada estratégia de busca apenas quando consumida."""
+        """
+        Gera pares (label, lista_de_candidatos), da estratégia mais
+        rápida (chaves, artificiais) para a mais custosa (dados do
+        artigo, o critério essencial de identidade — quem de fato
+        decide é select_record). Generator: uma branch só é montada e
+        avaliada se a anterior não resolver.
+        """
         qbuilder = QueryBuilderPidProviderXML(xml_adapter)
         qbuilder.validate_input_data()
 
         # select_related("current_version") já vem do manager
         objects = cls.objects.all()
 
-        # 1) correspondência direta por identificadores
-        identifiers = qbuilder.identifier_queries
-        yield "ids", list(objects.filter(identifiers)) if identifiers != Q() else []
+        # 1) busca por v3, v2, aop_pid, DOI
+        identifier_queries = qbuilder.identifier_queries
+        # distinct: identifier_queries inclui busca por collection_pids_v2
+        yield "ids", (
+            list(objects.filter(identifier_queries).distinct())
+            if identifier_queries != Q()
+            else []
+        )
 
         selected_journal = objects.filter(qbuilder.issn_query)
-
-        # 2) correspondência estrita, com ou sem fascículo
+        # 2) busca exata com journal + issue + dados do artigo
         yield (
             "journal-issue-article-strict",
             list(
                 selected_journal.filter(
-                    qbuilder.get_article_data_query(issue=True, flexible=False)
-                    | qbuilder.get_article_data_query(issue=False, flexible=False)
+                    qbuilder.get_article_data_query(issue=True, flexible=False) |
+                    qbuilder.get_article_data_query(issue=False, flexible=False)
                 )
             ),
         )
 
-        # 3) permite correções de texto, mantendo fascículo/localização
-        yield "journal-issue-article-flexible", list(
-            selected_journal.filter(
-                qbuilder.get_article_data_query(issue=True, flexible=True)
-                | qbuilder.get_article_data_query(issue=False, flexible=True)
-            )
+        # 3) busca flexível com journal + issue + dados do artigo
+        yield (
+            "journal-issue-article-flexible",
+            list(
+                selected_journal.filter(
+                    qbuilder.get_article_data_query(issue=True, flexible=True) |
+                    qbuilder.get_article_data_query(issue=False, flexible=True)
+                )
+            ),
         )
 
-    @staticmethod
-    def select_record(xml_adapter, selection_results):
-        """
-        Consome os pares (label, lista_de_candidatos) produzidos por
-        select_records. As listas já vêm materializadas, então aqui só
-        checamos truthiness (nunca .exists()/.count() sobre queryset).
-        """
-        unmatched_items = {}
-        xml_adapter_data_to_compare = get_data_to_compare(xml_adapter)
-        for label, results in selection_results:
-            if not results:
-                continue
-
-            result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)
-
-            matched = result.get("matched")
-            multiple_matched = result.get("multiple_matched")
-            unmatched = result.get("unmatched")
-            registered = result.get("registered")
-            if registered:
-                response = {
-                    "total_results": len(results),
-                    "registered": registered,
-                }
-                if matched:
-                    response["matched_items"] = {label: matched}
-                if multiple_matched:
-                    response["multiple_matched_items"] = {label: multiple_matched}
-                if unmatched:
-                    response["unmatched_items"] = {label: unmatched}
-                return response
-
-            if unmatched:
-                unmatched_items[label] = unmatched
-
-        if unmatched_items:
-            return {"unmatched_items": unmatched_items}
-        return {}
+    # compatibilidade: implementações em pid_provider.query_params
+    select_record = staticmethod(select_record)
+    get_best_match = staticmethod(get_best_match)
 
     @classmethod
     @profile_classmethod
@@ -1132,73 +1723,30 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         xml_pid_v3 = xml_adapter.v3
         # select_related("current_version") já vem do manager
         results = cls.objects.filter(v3=xml_pid_v3)
+
         if not results.exists():
             # pid v3 é inédito
             raise cls.DoesNotExist
-        
-        xml_adapter_data_to_compare = get_data_to_compare(xml_adapter)
-        result = PidProviderXML.get_best_match(results, xml_adapter_data_to_compare)
+
+        xml_adapter_data_to_compare = fix_get_data_to_compare(xml_adapter)
+        result = get_best_match(results, xml_adapter_data_to_compare)
+
         registered = result.get("registered")
         if not registered:
-            xml_data = xml_adapter.xml_with_pre.readable_data
-            items = [item.data for item in results]
             raise PidProviderXMLPidV3ConflictError(
-                _("{} belongs to {}, not to {}").format(
-                    xml_pid_v3, items, xml_data
+                _("{} do not belong to {}. Result: {}").format(
+                    xml_pid_v3, xml_adapter_data_to_compare, result,
                 )
             )
         return registered
 
-    @staticmethod
-    def get_best_match(results, xml_adapter_data):
-        """Classifica candidatos e sinaliza empates no maior score aprovado."""
-        detail = {}
-        found = []
-        items = {}
-        responses = {}
-        min_rate = settings.PID_PROVIDER_MIN_RATE
-        for item in results:
-            item_data = item.data_to_compare
-            response = compare(item_data, xml_adapter_data)
-            items[item.id] = item
-            responses[item.id] = response
-            found.append((response["percentual_score"], item.updated.isoformat(), item.id))
-        found = sorted(found, reverse=True)
-
-        matched = []
-        unmatched = []
-        for percentual_score, updated, item_id in found:
-            data = {"data": items[item_id].data, "response": responses[item_id]}
-            if percentual_score > min_rate:
-                matched.append(data)
-            else:
-                unmatched.append(data)
-        if matched:
-            registered_id = found[0][-1]
-            detail["registered"] = items[registered_id]
-            max_percentual_score = responses[registered_id]["percentual_score"]
-            if len(matched) > 1:
-                detail["matched"] = []
-                detail["multiple_matched"] = []
-                for matched_item in matched[1:]:
-                    if matched_item["response"]["percentual_score"] == max_percentual_score:
-                        detail["multiple_matched"].append(matched_item)
-                    else:
-                        detail["matched"].append(matched_item)
-                if detail["multiple_matched"]:
-                    detail["multiple_matched"].insert(0, matched[0])
-        if unmatched:
-            detail["unmatched"] = unmatched
-        return detail
-
     @profile_method
-    def _add_data(self, xml_adapter, registered_in_core):
+    def _add_data(self, xml_adapter, registered_in_core, readable_data=None):
         self.registered_in_core = bool(registered_in_core)
 
         self.pkg_name = xml_adapter.sps_pkg_name
         self.article_pub_year = xml_adapter.article_pub_year
         self.v3 = xml_adapter.v3
-        self.v2 = xml_adapter.v2
         self.aop_pid = xml_adapter.aop_pid
 
         self.fpage = xml_adapter.fpage
@@ -1213,7 +1761,9 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         self.z_links = xml_adapter.z_links
         self.z_partial_body = xml_adapter.xml_with_pre.body_fragment_fingerprint
 
-        self.readable_data = xml_adapter.xml_with_pre.readable_data
+        self.readable_data = readable_data or fix_get_article_data(
+            xml_adapter.xml_with_pre
+        )
 
     @profile_method
     def _add_dates(self, xml_adapter, origin_date, available_since):
@@ -1244,7 +1794,15 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         self.pub_year = xml_adapter.pub_year or xml_adapter.article_pub_year
 
     @profile_method
-    def _add_current_version(self, xml_with_pre, user, delete=False):
+    def _add_current_version(
+        self, xml_with_pre, user, delete=False
+    ):
+        """
+        Registra a versão do XML
+
+        Registra a versão como versão atual do documento
+        (self.current_version; ver updates_current_version)
+        """
         if delete:
             try:
                 self.current_version.delete()
@@ -1255,32 +1813,49 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         self.save()
 
     @profile_method
-    def check_registered_pids_changed(self, xml_with_pre):
+    def check_registered_pids_changed(self, xml_with_pre, ignore_v2=False):
         registered_changed = []
+        collection_acron = xml_with_pre.collection
+        # registro da coleção do XML: uma única consulta, com a versão
+        item = (
+            collection_acron
+            and self.collection_pids_v2.filter(collection__acron=collection_acron)
+            .select_related("current_version")
+            .first()
+        )
+
+        def get_current_version():
+            # versão da coleção do XML (ver CollectionPidV2.get_current_version)
+            # obtida somente se necessária
+            if item and item.current_version_id:
+                return item.current_version
+            return self.get_current_version(collection_acron=collection_acron)
+
         if self.v3 != xml_with_pre.v3:
             registered_changed.append(
                 {
                     "pid_type": "pid_v3",
                     "pid_in_xml": xml_with_pre.v3,
-                    "version": self.current_version,
+                    "version": get_current_version(),
                     "registered": self.v3,
                 }
             )
-        if self.v2 != xml_with_pre.v2:
+        if item and not ignore_v2 and item.pid_v2 != xml_with_pre.v2:
             registered_changed.append(
                 {
                     "pid_type": "pid_v2",
                     "pid_in_xml": xml_with_pre.v2,
-                    "version": self.current_version,
-                    "registered": self.v2,
+                    "version": item.current_version,
+                    "registered": item.pid_v2,
                 }
             )
+
         if self.aop_pid != xml_with_pre.aop_pid:
             registered_changed.append(
                 {
                     "pid_type": "aop_pid",
                     "pid_in_xml": xml_with_pre.aop_pid,
-                    "version": self.current_version,
+                    "version": get_current_version(),
                     "registered": self.aop_pid,
                 }
             )
@@ -1319,7 +1894,11 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         if v3:
             qs = Q(v3=v3) | Q(other_pid__pid_in_xml=v3)
         elif v2:
-            qs = Q(v2=v2) | Q(other_pid__pid_in_xml=v2)
+            qs = (
+                Q(v2=v2)
+                | Q(other_pid__pid_in_xml=v2)
+                | Q(collection_pids_v2__pid_v2=v2)
+            )
         elif aop_pid:
             qs = Q(v2=aop_pid) | Q(other_pid__pid_in_xml=aop_pid) | Q(aop_pid=aop_pid)
         else:
@@ -1350,34 +1929,34 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         try:
             select_record_response = None
             response = {}
-            response["input_data"] = xml_with_pre.data
+            response["input_data"] = fix_xml_with_pre_data(xml_with_pre)
 
             xml_adapter = xml_sps_adapter.PidProviderXMLAdapter(xml_with_pre)
             response["xml_adapter_data"] = xml_adapter.data
 
             try:
                 records = cls.select_records(xml_adapter)
-                select_record_response = cls.select_record(xml_adapter, records)
+                select_record_response = select_record(xml_adapter, records)
                 if select_record_response.get("multiple_matched_items"):
                     raise cls.MultipleObjectsReturned
-                if (
-                    select_record_response.get("matched_items")
-                    or select_record_response.get("unmatched_items")
-                ):
+                matched_items = select_record_response.get("matched_items")
+                unmatched_items = select_record_response.get("unmatched_items")
+                if matched_items or unmatched_items:
                     response["select_record_response"] = select_record_response
                 try:
                     registered = select_record_response.pop("registered")
                 except KeyError:
                     raise cls.DoesNotExist
             except cls.DoesNotExist as exc:
-                response.update(
-                    {"filename": xml_with_pre.filename, "registered": False}
-                )
+                response.update({
+                    "filename": xml_with_pre.filename,
+                    "registered": False
+                })
                 return response
             except cls.MultipleObjectsReturned as exc:
                 response["select_record_response"] = select_record_response
                 raise exceptions.QueryDocumentMultipleObjectsReturnedError(exc)
-            except exceptions.UnmatchedPidProviderXMLError:
+            except exceptions.UnmatchedPidProviderXMLError as exc:
                 response["select_record_response"] = select_record_response
                 raise
             except (
@@ -1388,9 +1967,31 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                 raise exc
             response["registered"] = True
             response.update(registered.data)
-            response["is_equal"] = registered.is_equal_to(xml_with_pre)
+            # pid v2 do XML de entrada (como em register), completado com o
+            # registrado quando ausente (ver complete_missing_xml_pids)
+            collection_acron = xml_with_pre.collection
+            response["v2"] = xml_with_pre.v2 or registered.get_pid_v2(
+                collection_acron
+            )
+            response["is_equal"] = registered.is_equal_to(
+                xml_with_pre, collection_acron
+            )
             if not registered.readable_data:
                 response["is_equal"] = False
+            if response["is_equal"]:
+                # XML igual ao registrado, mas dados por coleção incompletos:
+                # requer registro local (ver requester)
+                # consulta as coleções somente se necessário
+                collection = cls.get_xml_collection(xml_with_pre)
+                reasons = (
+                    registered.get_reasons_to_update(xml_with_pre, collection)
+                    if collection
+                    else None
+                )
+                if reasons:
+                    response["is_equal"] = False
+                    response["is_equal_xml"] = True
+                    response["reasons_to_update"] = reasons
             return response
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -1416,6 +2017,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         except cls.MultipleObjectsReturned as e:
             return cls.objects.filter(**params).order_by("-updated").first()
 
+    # OBSOLETO: o pid v2 é corrigido por coleção em proc.models.ArticleProc.fix_pid_v2
     @classmethod
     @profile_classmethod
     def fix_pid_v2(cls, user, pid_v3, correct_pid_v2):
@@ -1427,11 +2029,22 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
         try:
             if correct_pid_v2 == item.v2:
                 return item.data
-            xml_with_pre = item.current_version.xml_with_pre
+            incorrect_pid_v2 = item.v2
+            xml_with_pre = item.get_current_version().xml_with_pre
             xml_with_pre.v2 = correct_pid_v2
             item._add_current_version(xml_with_pre, user, delete=True)
             item.v2 = correct_pid_v2
             item.save()
+            # a versão anterior foi apagada (current_version = NULL)
+            # no registro da coleção do pid v2 corrigido
+            if incorrect_pid_v2:
+                for collection_pid_v2 in item.collection_pids_v2.filter(
+                    pid_v2=incorrect_pid_v2
+                ):
+                    collection_pid_v2.pid_v2 = correct_pid_v2
+                    collection_pid_v2.current_version = item.current_version
+                    collection_pid_v2.updated_by = user
+                    collection_pid_v2.save()
             return item.data
         except Exception as e:
             raise exceptions.PidProviderXMLFixPidV2Error(
@@ -1455,7 +2068,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
     def mark_items_as_invalid(cls, issns):
         # select_related("current_version") já vem do manager
         # (necessário aqui pois o loop acessa item.xml_with_pre, que usa
-        # self.current_version)
+        # self.get_current_version())
         items = cls.objects.filter(
             Q(issn_print__in=issns) | Q(issn_electronic__in=issns),
         )
@@ -1576,7 +2189,7 @@ class PidProviderXML(BasePidProviderXML, CommonControlField, ClusterableModel):
                     user=user,
                     pid_type="pid_v3",
                     pid_in_xml=item.v3,
-                    version=item.current_version,
+                    version=item.get_current_version(),
                     pid_provider_xml=most_recent_item,
                 )
         except Exception as exception:
@@ -1636,7 +2249,10 @@ class FixPidV2(CommonControlField):
         ]
 
     def __str__(self):
-        return f"{self.pid_provider_xml.v3}"
+        if self.pid_provider_xml and self.pid_provider_xml.v3:
+            return f"{self.pid_provider_xml.v3}"
+
+        return self.correct_pid_v2 or self.incorrect_pid_v2 or "-"
 
     @staticmethod
     @profile_staticmethod
@@ -1645,7 +2261,7 @@ class FixPidV2(CommonControlField):
 
     @profile_method
     def autocomplete_label(self):
-        return f"{self.pid_provider_xml.v3}"
+        return str(self)
 
     @classmethod
     @profile_classmethod
@@ -1739,12 +2355,6 @@ class FixPidV2(CommonControlField):
             )
 
 
-def xml_url_zipfile_path(instance, filename):
-    """Compatibilidade com a migração histórica 0009_xmlurl."""
-    url_hash = abs(hash(instance.url)) % (10 ** 8)
-    return f"pid_provider/xmlurl/{url_hash}/{filename}"
-
-
 @register_setting
 class PidProviderSetting(BaseGenericSetting):
     record_all_registration_events = models.BooleanField(
@@ -1765,11 +2375,17 @@ class PidProviderSetting(BaseGenericSetting):
 
 
 # -----------------------------------------------------------------------------
-# Auditoria por documento. Por padrão, grava apenas em erros ou ambiguidades
-# (matched_items). Caso a opção no Wagtail Admin esteja ativa, grava todos os
-# eventos. FK nullable porque erros e casos sem correspondência podem não ter PPX.
+# [models.py] MODELO NOVO — PidProviderXMLRegistration
+# Auditoria por documento. Por padrão, grava apenas em exceções, erros, conflitos
+# ou ambiguidades (matched_items). Caso a opção no Wagtail Admin esteja ativa,
+# grava em todos os eventos.
+# FK nullable (unmatched/error podem não ter PPX).
 # -----------------------------------------------------------------------------
 class PidProviderXMLRegistration(CommonControlField):
+    # registro técnico: o índice de referências do Wagtail (telas de uso do
+    # admin) não se aplica e custa várias consultas a cada gravação
+    wagtail_reference_index_ignore = True
+
     LIGHTWEIGHT_STATUSES = {"created", "updated", "skipped"}
 
     EVENT_CREATED = "created"

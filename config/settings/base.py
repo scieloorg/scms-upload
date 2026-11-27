@@ -335,15 +335,15 @@ LOGGING = {
         },
     },
     "loggers": {
-        "django_tasks": {
-            "level": "INFO",
-            "filters": ["reference_index_routine"],
-            "propagate": True,
-        },
         "profiling": {  # <-- Logger usado pelo decorador
             "handlers": ["profiling_file"],
             "level": "DEBUG",
             "propagate": False,
+        },
+        "django_tasks": {
+            "level": "INFO",
+            "filters": ["reference_index_routine"],
+            "propagate": True,
         },
     },
     "root": {"level": "INFO", "handlers": ["console"]},
@@ -439,4 +439,6 @@ PROFILING_LOG_SLOW_REQUESTS = env.float(
 PROFILING_LOG_HIGH_MEMORY = env.int("DJANGO_PROFILING_LOG_HIGH_MEMORY", default=20)
 PROFILING_LOG_ALL = env.bool("DJANGO_PROFILING_LOG_ALL", default=True)
 
+# Score mínimo (percentual_score) para considerar um candidato de PidProviderXML como aprovado
 PID_PROVIDER_MIN_RATE = env.float("PID_PROVIDER_MIN_RATE", default=0.65)
+

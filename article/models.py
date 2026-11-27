@@ -2,8 +2,9 @@ import logging
 import traceback
 from datetime import datetime, timezone
 
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import IntegrityError, models, transaction
 from django.db.models import Count, Max, Q
 from django.utils.translation import gettext_lazy as _
@@ -37,9 +38,10 @@ from issue.models import TOC, Issue, TocSection
 from journal.models import Journal, JournalSection, OfficialJournal
 from migration import choices as migration_choices
 from migration.models import ClassicWebsiteConfiguration
+from package import collection_pid_v2_completion as completion
 from package.models import SPSPkg
 from pid_provider.choices import PPXML_STATUS_INVALID
-from pid_provider.models import PidProviderXML
+from pid_provider.models import CollectionPidV2, PidProviderXML
 from upload import choices as upload_choices
 
 from . import choices
@@ -51,6 +53,39 @@ CHANGE_REQUEST_REQUIRED = _(
 )
 
 User = get_user_model()
+
+
+DATA_AVAILABILITY_XPATH = (
+    './body//sec[@sec-type="data-availability"]'
+    ' | ./body//fn[@fn-type="data-availability"]'
+    ' | ./back//sec[@sec-type="data-availability"]'
+    ' | ./back//fn[@fn-type="data-availability"]'
+)
+
+
+def get_data_availability_status(xmltree):
+    """
+    Obtém o status de disponibilidade de dados do artigo principal
+    (sub-articles são desconsiderados, pois traduções repetem a declaração).
+
+    Retorna o primeiro specific-use reconhecido; DAS_INVALID se há declaração
+    sem specific-use reconhecido; DAS_ABSENT se não há declaração.
+    """
+    if xmltree is None:
+        return None
+    root = xmltree.find(".") if hasattr(xmltree, "getroot") else xmltree
+    nodes = root.xpath(DATA_AVAILABILITY_XPATH)
+    if not nodes:
+        return choices.DAS_ABSENT
+    valid = dict(choices.DATA_AVAILABILITY_STATUS)
+    for node in nodes:
+        specific_use = (node.get("specific-use") or "").strip()
+        if specific_use in valid and specific_use not in (
+            choices.DAS_ABSENT,
+            choices.DAS_INVALID,
+        ):
+            return specific_use
+    return choices.DAS_INVALID
 
 
 def get_compiled_status(status_list):
@@ -114,8 +149,16 @@ class ArticleManager(models.Manager):
     """Manager customizado para Article com select_related otimizado."""
     
     def get_queryset(self):
-        """Por padrão, inclui select_related de sps_pkg em todas as queries."""
-        return ArticleQuerySet(self.model, using=self._db).select_related("sps_pkg", "journal", "issue")
+        """
+        Por padrão, inclui select_related do pacote e do documento na
+        coleção (collection_pid_v2) em todas as queries.
+        """
+        return ArticleQuerySet(self.model, using=self._db).select_related(
+            "sps_pkg",
+            "collection_pid_v2__collection",
+            "journal",
+            "issue",
+        )
 
 
 class Article(ClusterableModel, CommonControlField):
@@ -125,6 +168,21 @@ class Article(ClusterableModel, CommonControlField):
     No contexto de Upload, Article deve conter o mínimo de campos,
     suficiente para o processo de ingresso/validações, pois os dados
     devem ser obtidos do XML.
+
+    Artigo presente em mais de uma coleção tem um Article por coleção,
+    com o mesmo pid_v3, pois o XML (sps_pkg), o pid v2 e o acrônimo do
+    periódico podem diferir por coleção.
+
+    pid_v3 e pid_v2 não são únicos: o mesmo documento tem um Article por
+    coleção e o pid v2 pode se repetir entre coleções. Buscas devem
+    combiná-los com a coleção.
+
+    collection_pid_v2 (documento na coleção) é o vínculo com a coleção.
+    Artigos anteriores à separação por coleção não o têm; são vinculados
+    pela migração article 0014_complete_collection_pid_v2 e, o que ficar
+    pendente, pela tarefa article.tasks.task_complete_collection_pid_v2
+    (ver complete_collection_pid_v2). Quando vinculado,
+    pp_xml, pid_v2 e sps_pkg são mantidos iguais aos de collection_pid_v2.
     """
 
     # Manager customizado com select_related otimizado
@@ -140,10 +198,19 @@ class Article(ClusterableModel, CommonControlField):
         SPSPkg, blank=True, null=True, on_delete=models.SET_NULL
     )
     pid_v3 = models.CharField(
-        _("PID v3"), max_length=23, blank=True, null=True, unique=True
+        _("PID v3"), max_length=23, blank=True, null=True
     )
     pid_v2 = models.CharField(
         _("PID v2"), max_length=23, blank=True, null=True
+    )
+    # documento na coleção; vazio para artigos ainda não vinculados
+    # (anteriores à separação por coleção) ou sem coleção (ex.: ingresso)
+    collection_pid_v2 = models.OneToOneField(
+        CollectionPidV2,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="article",
     )
     article_type = models.CharField(
         _("Article type"),
@@ -161,6 +228,13 @@ class Article(ClusterableModel, CommonControlField):
     )
     position = models.PositiveIntegerField(_("Position"), blank=True, null=True)
     first_publication_date = models.DateField(null=True, blank=True)
+    data_availability_status = models.CharField(
+        _("Data availability status"),
+        max_length=32,
+        choices=choices.DATA_AVAILABILITY_STATUS,
+        blank=True,
+        null=True,
+    )
     first_pubdate_iso = models.CharField(
         _("First publication date ISO"), max_length=10, blank=True, null=True
     )
@@ -188,6 +262,7 @@ class Article(ClusterableModel, CommonControlField):
         heading="Article identifiers", classname="collapsible"
     )
     panel_article_ids.children = [
+        FieldPanel("collection_pid_v2", read_only=True),
         FieldPanel("pid_v2", read_only=True),
         FieldPanel("pid_v3", read_only=True),
     ]
@@ -197,6 +272,7 @@ class Article(ClusterableModel, CommonControlField):
     )
     panel_article_details.children = [
         FieldPanel("first_pubdate_iso", read_only=True),
+        FieldPanel("data_availability_status", read_only=True),
         FieldPanel("article_type", read_only=True),
         FieldPanel("status", read_only=True),
         InlinePanel(relation_name="title_with_lang", label="Title with Language"),
@@ -242,8 +318,19 @@ class Article(ClusterableModel, CommonControlField):
     base_form_class = ArticleForm
 
     class Meta:
+        constraints = [
+            # artigos anteriores à separação por coleção; os demais são
+            # únicos por collection_pid_v2 (documento na coleção)
+            models.UniqueConstraint(
+                fields=["pid_v3"],
+                condition=Q(collection_pid_v2__isnull=True),
+                name="article_unique_pid_v3_without_collection",
+            ),
+        ]
         indexes = [
             models.Index(fields=["status"]),
+            models.Index(fields=["pid_v3"]),
+            models.Index(fields=["pid_v2"]),
         ]
         ordering = ["position", "fpage", "-first_pubdate_iso"]
         permissions = (
@@ -268,6 +355,121 @@ class Article(ClusterableModel, CommonControlField):
             return self.sps_pkg.sps_pkg_name
         except AttributeError:
             return self.pid_v3 or self.pid_v2 or f"Article {self.pk}"
+
+    # ── documento na coleção (collection_pid_v2) ──
+
+    LINK_FIELDS = ["collection_pid_v2", "pp_xml", "pid_v2", "sps_pkg"]
+
+    @property
+    def collection(self):
+        return self.collection_pid_v2 and self.collection_pid_v2.collection
+
+    def set_collection_pid_v2(self, collection_pid_v2):
+        """
+        Vincula o artigo ao documento na coleção e mantém pp_xml, pid_v2 e
+        sps_pkg iguais aos do documento na coleção
+        """
+        self.collection_pid_v2 = collection_pid_v2
+        if not collection_pid_v2:
+            return
+        self.pp_xml_id = collection_pid_v2.pid_provider_xml_id
+        self.pid_v2 = collection_pid_v2.pid_v2 or self.pid_v2
+        try:
+            self.sps_pkg = collection_pid_v2.sps_pkg
+        except ObjectDoesNotExist:
+            pass
+
+    def get_pp_xml_id(self):
+        """
+        PidProviderXML do artigo: o do documento na coleção ou, na falta
+        dele, pp_xml ou o único do pid_v3 (legado)
+        """
+        if self.collection_pid_v2_id:
+            return self.collection_pid_v2.pid_provider_xml_id
+        return completion.get_unique_ppx_id(django_apps, self.pp_xml_id, self.pid_v3)
+
+    def get_pid_v2(self):
+        """
+        PID v2 do artigo: o do documento na coleção ou, na falta dele,
+        pid_v2 (legado)
+        """
+        if self.collection_pid_v2_id and self.collection_pid_v2.pid_v2:
+            return self.collection_pid_v2.pid_v2
+        return self.pid_v2
+
+    def get_collection_pid_v2_without_sps_pkg(self, user):
+        """
+        Documento na coleção do artigo sem pacote, se não houver
+        ambiguidade
+        (ver package.collection_pid_v2_completion.get_article_collection_pid_v2_without_sps_pkg)
+
+        Retorna (collection_pid_v2, None) ou (None, motivo)
+        """
+        return completion.get_article_collection_pid_v2_without_sps_pkg(
+            django_apps, self, user and user.id
+        )
+
+    def complete_collection_pid_v2(self, user=None, sync_fields=False):
+        """
+        Vincula ao documento na coleção (collection_pid_v2) o artigo
+        anterior à separação por coleção, somente se não houver ambiguidade
+        (ver package.collection_pid_v2_completion.link_article)
+
+        sync_fields: se False, pp_xml, pid_v2 e sps_pkg (legado) são
+        mantidos e somente os vazios são completados
+
+        Retorna o resultado: "linked", "already_linked", "no_ppx",
+        "no_collection" ou "taken" (documento na coleção já tem outro
+        artigo)
+        """
+        return completion.link_article(
+            django_apps, self, user and user.id, sync_fields
+        )
+
+    def complete_journal_acron(self, collection_pid_v2):
+        """
+        Completa o acrônimo do periódico no documento na coleção com o do
+        periódico do artigo na coleção (JournalProc)
+        """
+        completion.complete_journal_acron(django_apps, self, collection_pid_v2)
+
+    @classmethod
+    def complete_collection_pid_v2_batch(cls, user, last_id=0, batch_size=100):
+        """
+        Vincula ao documento na coleção um lote de artigos ainda não
+        vinculados, com id > last_id, em ordem de id
+        (ver package.collection_pid_v2_completion.complete_batch)
+
+        Retorna (stats, last_id, done)
+        """
+        return completion.complete_batch(
+            django_apps, "Article", user and user.id, last_id, batch_size
+        )
+
+    @classmethod
+    def _filter_in_collection(cls, queryset, collection):
+        """
+        Artigos de queryset que pertencem à coleção: os vinculados ao
+        documento na coleção e os ainda não vinculados (legados, pendentes
+        da migração article 0014_complete_collection_pid_v2 / da tarefa
+        article.tasks.task_complete_collection_pid_v2)
+        """
+        return queryset.filter(
+            Q(collection_pid_v2__collection=collection)
+            | Q(collection_pid_v2__isnull=True)
+        )
+
+    @classmethod
+    def _get_in_collection(cls, queryset, collection):
+        """
+        Obtém o artigo de queryset que pertence à coleção, priorizando o
+        vinculado ao documento na coleção
+        """
+        qs = cls._filter_in_collection(queryset, collection)
+        try:
+            return qs.get(collection_pid_v2__collection=collection)
+        except cls.DoesNotExist:
+            return qs.get(collection_pid_v2__isnull=True)
 
     # ── properties delegadas ao sps_pkg ──
 
@@ -305,6 +507,7 @@ class Article(ClusterableModel, CommonControlField):
     def data(self):
         return dict(
             xml=self.sps_pkg and self.sps_pkg.xml_uri,
+            collection=self.collection and self.collection.acron,
             issue=self.issue.data,
             journal=self.journal.data,
             pid_v3=self.pid_v3,
@@ -327,7 +530,13 @@ class Article(ClusterableModel, CommonControlField):
 
     @classmethod
     def identify(cls, pid_v3=None, pid_v2=None, doi=None, collection_acron=None):
-        """Resolve supplied identifiers without comparing the XML contents."""
+        """
+        Resolve supplied identifiers without comparing the XML contents.
+
+        Um documento publicado em mais de uma coleção tem um Article por
+        coleção (mesmo pid_v3); os registros são agrupados por pid_v3 e,
+        se collection_acron for informado, prioriza-se o da coleção.
+        """
         identifiers = Q()
         if pid_v3:
             identifiers |= Q(pid_v3=pid_v3)
@@ -338,69 +547,143 @@ class Article(ClusterableModel, CommonControlField):
         if not identifiers:
             return None
 
-        matches = list(cls.objects.filter(identifiers).distinct())
-        if len(matches) > 1:
+        matches = list(cls.objects.filter(identifiers).distinct().order_by("-updated"))
+        if not matches:
+            return None
+        if len({item.pid_v3 for item in matches}) > 1:
             raise ValidationError(
                 _("The submitted identifiers refer to different documents.")
             )
-        if not matches:
-            return None
 
         article = matches[0]
         if pid_v3 and article.pid_v3 != pid_v3:
             raise ValidationError(
                 _("The submitted identifiers refer to different documents.")
             )
-        if (
-            collection_acron
-            and not article.journal.journal_collections.filter(
+        if collection_acron:
+            for item in matches:
+                if item.collection and item.collection.acron == collection_acron:
+                    return item
+            if not article.journal.journal_collections.filter(
                 collection__acron=collection_acron
-            ).exists()
-        ):
-            raise ValidationError(
-                _("The submitted collection does not match the registered document.")
-            )
+            ).exists():
+                raise ValidationError(
+                    _("The submitted collection does not match the registered document.")
+                )
         return article
 
     @classmethod
-    def get(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None):
-        params = {}
+    def get(
+        cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, sps_pkg=None, collection=None
+    ):
+        """
+        Obtém o Article do documento na coleção.
+
+        Há um Article por documento na coleção (mesmo pid_v3 em coleções
+        diferentes; pid_v2 e sps_pkg_name dependem da coleção), então
+        pid_v3, pid_v2 e sps_pkg_name devem ser combinados com collection.
+        sps_pkg dispensa collection, pois é único por documento na coleção.
+
+        Prioriza as chaves determinísticas (pid_v3, pid_v2); sps_pkg_name
+        (identificação humana, depende de vários dados do XML) é usado
+        somente na falta delas.
+
+        Artigos ainda não vinculados ao documento na coleção são retornados
+        sem completar o vínculo (ver _get_in_collection).
+        """
         if sps_pkg:
-            params["sps_pkg"] = sps_pkg
-        if pid_v2:
-            params["pid_v2"] = pid_v2
-        if pid_v3:
-            params["pid_v3"] = pid_v3
-        if sps_pkg_name:
-            params["sps_pkg__sps_pkg_name"] = sps_pkg_name
+            qs = cls.objects.filter(sps_pkg=sps_pkg)
+            if collection:
+                return cls._get_in_collection(qs, collection)
+            return qs.get()
 
-        if not params:
-            raise ValueError("Article.get requires sps_pkg, pid_v3, pid_v2 or sps_pkg_name")
-        
-        return cls.objects.get(**params)
-    
-    @classmethod
-    def get_first(cls, pid_v2=None, sps_pkg_name=None, pid_v3=None, delete=False, name_list=None):
-        q = Q()
-        if pid_v2:
-            q |= Q(pid_v2=pid_v2)
-        if name_list:
-            q |= Q(sps_pkg__sps_pkg_name__in=name_list)
-        if sps_pkg_name:
-            q |= Q(sps_pkg__sps_pkg_name=sps_pkg_name)
-        qs = cls.objects.filter(q).order_by("-updated")
-        obj = qs.first()
-        if obj is None:
-            qs = cls.objects.filter(pid_v3=pid_v3).order_by("-updated")
-            obj = qs.first()
-            if obj is None:
-                raise cls.DoesNotExist            
-        if delete:
-            cls.delete_queryset(qs.exclude(pk=obj.pk))
-        return obj
+        if not collection:
+            raise ValueError(
+                "Article.get requires collection with pid_v3 or pid_v2 or sps_pkg_name, or sps_pkg"
+            )
+        if not (pid_v3 or pid_v2 or sps_pkg_name):
+            raise ValueError(
+                "Article.get requires pid_v3 or pid_v2 or sps_pkg_name with collection, or sps_pkg"
+            )
+
+        qs = cls.objects.all()
+        if pid_v3 or pid_v2:
+            if pid_v2:
+                qs = qs.filter(pid_v2=pid_v2)
+            if pid_v3:
+                qs = qs.filter(pid_v3=pid_v3)
+        else:
+            qs = cls.filter_by_sps_pkg_name(qs, sps_pkg_name)
+        return cls._get_in_collection(qs, collection)
 
     @classmethod
-    def delete_queryset(cls, qs):
+    def filter_by_sps_pkg_name(cls, qs, sps_pkg_name):
+        """
+        Filtra pelo nome do pacote SPS (identificação humana).
+
+        O nome do pacote é o de SPSPkg; CollectionPidV2.sps_pkg_name é
+        usado somente para os documentos sem pacote.
+        """
+        return qs.filter(
+            Q(sps_pkg__sps_pkg_name=sps_pkg_name)
+            | Q(
+                sps_pkg__isnull=True,
+                collection_pid_v2__sps_pkg_name=sps_pkg_name,
+            )
+        )
+
+    @classmethod
+    def get_by_sps_pkg_name(cls, sps_pkg_name, collection=None):
+        """
+        Obtém o Article pelo nome do pacote SPS (identificação humana)
+        """
+        if not sps_pkg_name:
+            raise ValueError("Article.get_by_sps_pkg_name requires sps_pkg_name")
+        qs = cls.filter_by_sps_pkg_name(cls.objects.all(), sps_pkg_name)
+        if collection:
+            return cls._get_in_collection(qs, collection)
+        return qs.get()
+
+    @classmethod
+    def filter_by_journal_acron(cls, qs, journal_acron):
+        """
+        Filtra os artigos pelo acrônimo do periódico na coleção do artigo.
+
+        Journal.journal_acron fica vazio quando o periódico tem acrônimos
+        diferentes nas coleções; o acrônimo na coleção está em
+        JournalProc (journal, collection, acron).
+        """
+        from proc.models import JournalProc
+
+        return qs.filter(
+            Q(journal__journal_acron=journal_acron)
+            | Q(
+                models.Exists(
+                    JournalProc.objects.filter(
+                        journal=models.OuterRef("journal"),
+                        collection=models.OuterRef("collection_pid_v2__collection"),
+                        acron=journal_acron,
+                    )
+                )
+            )
+        )
+
+    @classmethod
+    def get_by_pid_v3(cls, pid_v3):
+        """
+        Retorna o Article do pid_v3, priorizando o da coleção principal
+        (artigo em mais de uma coleção tem um Article por coleção)
+        """
+        items = list(cls.objects.filter(pid_v3=pid_v3).order_by("-updated"))
+        if not items:
+            raise cls.DoesNotExist(f"Article pid_v3={pid_v3} does not exist")
+        for item in items:
+            if item.collection and item.collection.is_national_journal_collection:
+                return item
+        return items[0]
+
+    @classmethod
+    def delete_related_items(cls, qs):
         ArticleDOIWithLang.objects.filter(article__in=qs).delete()
         ArticleTitle.objects.filter(parent__in=qs).delete()
         ArticleCollection.objects.filter(article__in=qs).delete()
@@ -410,44 +693,121 @@ class Article(ClusterableModel, CommonControlField):
     # ── create_or_update ──
 
     @classmethod
-    def create_or_update(cls, user, sps_pkg, issue=None, journal=None, position=None):
+    def _get_to_update(cls, user, sps_pkg, collection_pid_v2=None):
+        """
+        Obtém o Article a atualizar
+
+        Com documento na coleção (collection_pid_v2): o Article vinculado a
+        ele ou, na falta, o Article ainda não vinculado do mesmo pacote ou
+        pid_v3 (anterior à separação por coleção), cujo vínculo é
+        completado; é reaproveitado se for desta coleção ou se a coleção
+        continuar ambígua, mas não se for de outra coleção.
+
+        Sem documento na coleção (ex.: ingresso): o Article do pacote ou o
+        do pid_v3 (priorizando o não vinculado e, depois, o da coleção
+        principal)
+        """
+        pid_v3 = sps_pkg.pid_v3
+        q = Q(sps_pkg=sps_pkg)
+        if pid_v3:
+            q |= Q(pid_v3=pid_v3)
+
+        if collection_pid_v2:
+            try:
+                return cls.objects.get(collection_pid_v2=collection_pid_v2)
+            except cls.DoesNotExist:
+                pass
+            for item in cls.objects.filter(q, collection_pid_v2__isnull=True).order_by(
+                "-updated"
+            ):
+                item.complete_collection_pid_v2(user)
+                if item.collection_pid_v2_id in (None, collection_pid_v2.id):
+                    return item
+            raise cls.DoesNotExist
+
+        obj = (
+            cls.objects.filter(sps_pkg=sps_pkg).order_by("-updated").first()
+            or (
+                pid_v3
+                and cls.objects.filter(
+                    pid_v3=pid_v3, collection_pid_v2__isnull=True
+                ).first()
+            )
+        )
+        if obj:
+            return obj
+        if pid_v3:
+            return cls.get_by_pid_v3(pid_v3)
+        raise cls.DoesNotExist
+
+    @classmethod
+    def create_or_update(
+        cls, user, sps_pkg, issue=None, journal=None, position=None, collection=None
+    ):
+        """
+        Cria / atualiza o Article do documento na coleção do pacote
+        (sps_pkg.collection_pid_v2)
+
+        Pacote ainda não vinculado ao documento na coleção é vinculado,
+        se possível; pacote sem coleção (ex.: ingresso) gera Article sem
+        collection_pid_v2
+
+        collection: se informada, deve ser a coleção do pacote
+        """
         if not sps_pkg:
             raise ValueError("create_article requires sps_pkg")
+
+        if not sps_pkg.collection_pid_v2_id:
+            sps_pkg.complete_collection_pid_v2(user)
+        collection_pid_v2 = sps_pkg.collection_pid_v2
+        if collection and not collection_pid_v2:
+            raise ValueError(
+                f"SPSPkg {sps_pkg} is missing collection_pid_v2 (document in the collection {collection})"
+            )
+        if collection and collection_pid_v2.collection_id != collection.id:
+            raise ValueError(
+                f"SPSPkg {sps_pkg} collection ({collection_pid_v2.collection}) is not {collection}"
+            )
 
         xml_with_pre = sps_pkg.xml_with_pre
         if not xml_with_pre:
             raise ValueError(f"SPSPkg {sps_pkg} is missing xml_with_pre")
 
         try:
-            obj = cls.get(sps_pkg=sps_pkg)
+            obj = cls._get_to_update(user, sps_pkg, collection_pid_v2)
         except cls.DoesNotExist:
             obj = cls()
             obj.creator = user
 
-        obj.pid_v3 = sps_pkg.pid_v3
-        obj.pid_v2 = sps_pkg.pid_v2
         obj.sps_pkg = sps_pkg
+        obj.pid_v3 = sps_pkg.pid_v3
+        obj.pid_v2 = sps_pkg.pid_v2 or obj.pid_v2
+        obj.pp_xml_id = sps_pkg.ppx_id or obj.pp_xml_id
+        if collection_pid_v2:
+            obj.set_collection_pid_v2(collection_pid_v2)
+        obj.updated_by = user
         obj.article_type = xml_with_pre.xmltree.find(".").get("article-type")
 
         if journal:
             obj.journal = journal
         else:
-            obj.add_journal(user)
+            obj.add_journal(xml_with_pre)
         if issue:
             obj.issue = issue
         else:
-            obj.add_issue(user)
+            obj.add_issue(xml_with_pre)
 
         obj.status = obj.status or choices.AS_READY_TO_PUBLISH
-        obj.add_pages()
-        obj.add_position(position, xml_with_pre.fpage)
+        obj.add_pages(xml_with_pre)
         obj.add_article_publication_date()
-        obj.add_pp_xml()
+        obj.add_data_availability_status(xml_with_pre)
+        obj.add_position(position, xml_with_pre.fpage)
         obj.save()
 
-        obj.add_sections(user)
-        obj.add_article_titles(user)
+        obj.add_sections(user, xml_with_pre)
+        obj.add_article_titles(user, xml_with_pre)
         obj.add_doi_with_lang(user, xml_with_pre.article_doi_with_lang)
+        obj.add_position_in_table_of_contents()
         return obj
 
     # ── add_* helpers ──
@@ -461,33 +821,16 @@ class Article(ClusterableModel, CommonControlField):
             except Exception as e:
                 logging.exception(e)
 
-    def add_pp_xml(self, save=False):
-        if self.sps_pkg_id and self.sps_pkg.ppx_id:
-            self.pp_xml = self.sps_pkg.ppx
-        elif not self.pp_xml:
-            try:
-                self.pp_xml = PidProviderXML.get_by_pid_v3(pid_v3=self.pid_v3)
-            except PidProviderXML.DoesNotExist:
-                return
-        else:
-            return
-
-        if save:
-            self.save()
-        return self
-
     def add_related_item(self, target_doi, target_article_type):
         self.save()
 
-    def add_pages(self):
-        xml_with_pre = self.sps_pkg.xml_with_pre
+    def add_pages(self, xml_with_pre):
         self.fpage = xml_with_pre.fpage
         self.fpage_seq = xml_with_pre.fpage_seq
         self.lpage = xml_with_pre.lpage
         self.elocation_id = xml_with_pre.elocation_id
 
-    def add_issue(self, user):
-        xml_with_pre = self.sps_pkg.xml_with_pre
+    def add_issue(self, xml_with_pre):
         self.issue = Issue.get(
             journal=self.journal,
             volume=xml_with_pre.volume,
@@ -495,8 +838,7 @@ class Article(ClusterableModel, CommonControlField):
             number=xml_with_pre.number,
         )
 
-    def add_journal(self, user):
-        xml_with_pre = self.sps_pkg.xml_with_pre
+    def add_journal(self, xml_with_pre):
         self.journal = Journal.get(
             official_journal=OfficialJournal.get(
                 issn_electronic=xml_with_pre.journal_issn_electronic,
@@ -504,11 +846,11 @@ class Article(ClusterableModel, CommonControlField):
             ),
         )
 
-    def add_article_titles(self, user):
+    def add_article_titles(self, user, xml_with_pre):
         titles = ArticleTitles(
-            xmltree=self.sps_pkg.xml_with_pre.xmltree,
+            xmltree=xml_with_pre.xmltree,
         ).article_title_list
-        self.title_with_lang.all().delete()
+        self.title_with_lang.clear()
         for title in titles:
             try:
                 language_code2 = title.get("language") or title.get("lang")
@@ -534,20 +876,17 @@ class Article(ClusterableModel, CommonControlField):
             except Exception as e:
                 logging.exception(e)
 
-    def add_sections(self, user):
-        self.sections.all().delete()
+    def add_sections(self, user, xml_with_pre):
+        self.sections.clear()
 
         xml_sections = ArticleTocSections(
-            xmltree=self.sps_pkg.xml_with_pre.xmltree,
+            xmltree=xml_with_pre.xmltree,
         )
 
         items = xml_sections.article_section
         items.extend(xml_sections.sub_article_section)
 
-        try:
-            toc = TOC.objects.get(issue=self.issue)
-        except TOC.DoesNotExist:
-            toc = TOC.create_or_update(user, self.issue, ordered=False)
+        toc = TOC.create_or_update(user, self.issue, ordered=False)
 
         group = None
         for item in items:
@@ -575,20 +914,53 @@ class Article(ClusterableModel, CommonControlField):
             self.first_publication_date = datetime.fromisoformat(value).date()
             self.save()
 
+    @classmethod
+    def update_data_availability_status(cls, queryset=None, force_update=False):
+        """
+        Preenche data_availability_status de artigos já existentes
+        a partir do XML do sps_pkg.
+        """
+        qs = queryset if queryset is not None else cls.objects.all()
+        qs = qs.filter(sps_pkg__isnull=False)
+        if not force_update:
+            qs = qs.filter(data_availability_status__isnull=True)
+        updated = 0
+        for article in qs.iterator():
+            try:
+                xml_with_pre = article.sps_pkg.xml_with_pre
+                if not xml_with_pre:
+                    continue
+                article.add_data_availability_status(xml_with_pre)
+                article.save(update_fields=["data_availability_status"])
+                updated += 1
+            except Exception as e:
+                logging.exception(e)
+        return updated
+
+    def add_data_availability_status(self, xml_with_pre):
+        try:
+            self.data_availability_status = get_data_availability_status(
+                xml_with_pre.xmltree
+            )
+        except Exception as e:
+            logging.exception(e)
+
     def add_position(self, position=None, fpage=None):
         try:
             self.position = int(position or fpage)
-            return
         except (ValueError, TypeError):
-            pass
-        if not self.created:
-            self.save()
+            self.position = None
+
+    def add_position_in_table_of_contents(self):
+        if self.position:
+            return
         position = TocSection.get_section_position(self.issue, self.sections) or 0
         sections = [item.text for item in self.sections.all()]
         self.position = (
             position * 10000
             + Article.objects.filter(sections__text__in=sections).count()
         )
+        self.save()
 
     # ── display properties ──
 
@@ -647,7 +1019,7 @@ class Article(ClusterableModel, CommonControlField):
 
     # ── URL generators ──
 
-    def get_html_urls(self, website_url, purpose):
+    def get_html_urls(self, website_url, purpose, journal_acron=None):
         """
         Gera dicts de URL para HTML do artigo.
 
@@ -657,19 +1029,21 @@ class Article(ClusterableModel, CommonControlField):
         purpose : str
             ARTICLE_WEBPAGE_PURPOSE_CLASSIC, ARTICLE_WEBPAGE_PURPOSE_PUBLIC
             ou ARTICLE_WEBPAGE_PURPOSE_QA.
+        journal_acron : str, optional
+            Acrônimo do periódico na coleção (JournalProc.acron).
 
         Yields
         ------
         dict  {"url", "format", "lang", "purpose"}
         """
-        pid_v2 = self.pid_v2
+        pid_v2 = self.get_pid_v2()
         pid_v3 = self.pid_v3
         is_classic = purpose == choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC
 
         if is_classic:
             journal_acron = None
         else:
-            journal_acron = self.journal.journal_acron
+            journal_acron = journal_acron or self.journal.get_acron()
 
         for item in self.htmls:
             lang = item.get("lang")
@@ -690,7 +1064,7 @@ class Article(ClusterableModel, CommonControlField):
                 "purpose": purpose,
             }
 
-    def get_pdf_urls(self, website_url, purpose):
+    def get_pdf_urls(self, website_url, purpose, journal_acron=None):
         """
         Gera dicts de URL para PDF do artigo.
 
@@ -698,14 +1072,18 @@ class Article(ClusterableModel, CommonControlField):
         ----------
         website_url : str
         purpose : str
+        journal_acron : str, optional
+            Acrônimo do periódico na coleção (JournalProc.acron).
 
         Yields
         ------
         dict  {"url", "format", "lang", "purpose"}
         """
-        pid_v2 = self.pid_v2
+        pid_v2 = self.get_pid_v2()
         pid_v3 = self.pid_v3
         is_classic = purpose == choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC
+        if not is_classic:
+            journal_acron = journal_acron or self.journal.get_acron()
 
         for item in self.pdfs:
             lang = item.get("lang")
@@ -716,7 +1094,6 @@ class Article(ClusterableModel, CommonControlField):
                     website_url, pid_v2=pid_v2, format="pdf", lang_code=lang
                 )
             else:
-                journal_acron = self.journal.journal_acron
                 url = format_url(
                     website_url, pid_v3, journal_acron, format="pdf", lang_code=lang
                 )
@@ -727,13 +1104,15 @@ class Article(ClusterableModel, CommonControlField):
                 "purpose": purpose,
             }
 
-    def get_webpage_items(self, website_url, purpose):
+    def get_webpage_items(self, website_url, purpose, journal_acron=None):
         """Gera todos os itens de página (HTML + PDF) para um purpose."""
-        yield from self.get_html_urls(website_url, purpose)
-        yield from self.get_pdf_urls(website_url, purpose)
+        yield from self.get_html_urls(website_url, purpose, journal_acron)
+        yield from self.get_pdf_urls(website_url, purpose, journal_acron)
 
-    def get_main_article_url(self, website_url):
-        return format_url(website_url, self.pid_v3, self.journal.journal_acron)
+    def get_main_article_url(self, website_url, journal_acron=None):
+        return format_url(
+            website_url, self.pid_v3, journal_acron or self.journal.get_acron()
+        )
 
     # ── repetitions / dedup ──
 
@@ -753,59 +1132,35 @@ class Article(ClusterableModel, CommonControlField):
             kwargs["sps_pkg__id__in"] = sps_pkg_list
         return cls.objects.filter(**kwargs)
 
-    @classmethod
-    def fix_sps_pkg_names(cls, items=None):
-        if not items:
-            items = cls.objects
-        items.filter(
-            sps_pkg__isnull=False,
-            issue__supplement__isnull=False,
-        ).select_related(
-            "sps_pkg", "pp_xml",
-        ).exclude(
-            Q(sps_pkg__sps_pkg_name__contains="-s"),
-        )
-
-        response = []
-        for item in items:
-            data = {}
-            try:
-                data["pid_v3"] = item.pid_v3
-                data["pid_v2"] = item.pid_v2
-                try:
-                    data["sps_pkg__pkg_name"] = item.sps_pkg.sps_pkg_name
-                    data["sps_pkg__pkg_name_fixed"] = item.fix_sps_pkg_name()
-                except Exception:
-                    data["sps_pkg__pkg_name_exception"] = traceback.format_exc()
-                try:
-                    data["pp_xml__pkg_name"] = item.pp_xml.pkg_name
-                    data["pp_xml__pkg_name_fixed"] = item.pp_xml.fix_pkg_name(
-                        data.get("sps_pkg__pkg_name")
-                    )
-                except Exception:
-                    data["pp_xml__pkg_name_exception"] = traceback.format_exc()
-            except Exception:
-                data["exception"] = traceback.format_exc()
-            response.append(data)
-        return response
-
-    def fix_sps_pkg_name(self):
-        if self.sps_pkg:
-            return self.sps_pkg.fix_sps_pkg_name()
-
     # ── ArticleCollection: ponto de entrada ──
 
     def create_or_update_article_collections(self, user, force_update=None):
         """
         Obtém ou cria ArticleCollection para cada coleção do journal
         e delega a criação das ArticleWebPages.
+
+        As páginas de uma coleção são reconstruídas automaticamente
+        quando a WebSiteConfiguration vigente foi alterada após a
+        última reconstrução (``ArticleCollection.is_stale``), sem que
+        o chamador precise decidir isso via ``force_update``.
         """
         items = []
         if not force_update:
             force_update = self.pages.filter(url__startswith="None").exists()
         try:
-            for journal_proc in self.journal.journalproc_set.all():
-                collection = journal_proc.collection
+            if self.collection:
+                # um Article por coleção; remove o que era de outras coleções
+                # (artigo anterior à separação por coleção)
+                self.article_collections.exclude(collection=self.collection).delete()
+                self.pages.exclude(collection=self.collection).delete()
+                collections = [self.collection]
+            else:
+                # artigo anterior à separação por coleção
+                collections = [
+                    journal_proc.collection
+                    for journal_proc in self.journal.journalproc_set.all()
+                ]
+            for collection in collections:
                 art_col = ArticleCollection.get_or_create(user, self, collection)
                 if force_update or art_col.is_stale():
                     art_col.create_or_update_pages(user)
@@ -854,12 +1209,13 @@ class Article(ClusterableModel, CommonControlField):
             if section.text:
                 items.append((f"section.{i}", section.text))
 
-        if self.pid_v2:
-            items.append(("pid_v2", self.pid_v2))
+        pid_v2 = self.get_pid_v2()
+        if pid_v2:
+            items.append(("pid_v2", pid_v2))
 
         try:
             xmltree = self.sps_pkg.xml_with_pre.xmltree
-            contribs = xmltree.findall(
+            contribs = xmltree.xpath(
                 ".//front/article-meta/contrib-group/"
                 "contrib[@contrib-type='author']"
             )
@@ -951,18 +1307,25 @@ class Article(ClusterableModel, CommonControlField):
         return response
  
     @classmethod
-    def get_repeated_values(cls, field_name, queryset=None, issue=None):
+    def get_repeated_values(cls, field_name, queryset, issue=None, other_field_names=None):
+        """
+        Retorna os valores de field_name repetidos ou, se other_field_names
+        é informado, as tuplas de valores (field_name, *other_field_names)
+        repetidas
+        """
         if not queryset:
-            queryset = cls.objects
+            raise ValueError("Article.get_repeated_values requires queryset")
         params = {}
         if issue:
             params["issue"] = issue
         queryset = queryset.filter(**params)
+        field_names = (field_name,) + tuple(other_field_names or ())
         return (
-            queryset.values(field_name)
+            queryset.values(*field_names)
+            .filter(sps_pkg__isnull=False)
             .annotate(total=Count("id"))
             .filter(total__gt=1)
-            .values_list(field_name, flat=True)
+            .values_list(*field_names, flat=not other_field_names)
         )
 
     @classmethod
@@ -992,155 +1355,141 @@ class Article(ClusterableModel, CommonControlField):
         return response
 
     @classmethod
-    def exclude_invalid_records(cls, user, issue, sps_pkg_id_list=None, timeout=None, *, delete=False):
-        if not delete:
-            return {"total_deleted_items": 0}
+    def exclude_invalid_records(
+        cls,
+        user,
+        issue,
+        delete_article_which_sps_pkg_is_missing=False,
+        delete_article_which_is_duplicated=False,
+        timeout=None,
+    ):
+        """
+        Remove Article inválidos do fascículo somente quando solicitado
+        explicitamente pelas flags (por padrão, não exclui nada).
+        """
         try:
-            return cls._exclude_invalid_records(user, issue, sps_pkg_id_list, timeout)
+            return cls._exclude_invalid_records(
+                user,
+                issue,
+                delete_article_which_sps_pkg_is_missing,
+                delete_article_which_is_duplicated,
+                timeout,
+            )
         except Exception as e:
             return {"error": str(e), "error_type": str(type(e)), "traceback": traceback.format_exc()}
 
     @classmethod
-    def _exclude_invalid_records(cls, user, issue, sps_pkg_id_list, timeout=None):
+    def _exclude_invalid_records(
+        cls,
+        user,
+        issue,
+        delete_article_which_sps_pkg_is_missing=True,
+        delete_article_which_is_duplicated=True,
+        timeout=None,
+    ):
         total_deletado = 0
-        
-        # Estrutura exata solicitada por você
-        response = {
-            "sps_pkg_with_invalid_pid_v2": [],
-            "ppxml_invalid": [],
-            "repeated_sps_pkg__sps_pkg_name": [],
-            "repeated_pid_v2": [],
-            "deleted_ppxml_ids": [],
-            "deleted_sps_pkg_ids": [],
-            "deleted_article_ids": [],
-            "total_deleted_items": 0
-        }
-        ppxml_to_delete = set()
-        sps_pkg_to_delete = set()
-        
-        events = []
+        response = {}
         exceptions = []
+        articles = cls.objects.filter(issue=issue)
+        response["total_articles"]= articles.count()
+        response["params"] = {
+            "delete_article_which_sps_pkg_is_missing": delete_article_which_sps_pkg_is_missing,
+            "delete_article_which_is_duplicated": delete_article_which_is_duplicated,            
+        }
 
-        qs = cls.objects.select_related("pp_xml", "sps_pkg").filter(issue=issue)
-        q = Q(sps_pkg__isnull=True)
-        if sps_pkg_id_list:
-            q |= Q(sps_pkg__id__in=sps_pkg_id_list)
-        
-        qs = qs.filter(q)
-        if qs.exists():
-            sps_pkg_names = []
-            for pp_xml_id, sps_pkg_name, sps_pkg_id in qs.values_list("pp_xml_id", "sps_pkg__sps_pkg_name", "sps_pkg_id"):
-                if pp_xml_id:
-                    ppxml_to_delete.add(pp_xml_id)
-                if sps_pkg_id:
-                    sps_pkg_to_delete.add(sps_pkg_id)
-                    sps_pkg_names.append(sps_pkg_name)
-            response["sps_pkg_with_invalid_pid_v2"] = sps_pkg_names
-            qtd_deleted, _ignored = cls.delete_queryset(qs)
-            total_deletado += qtd_deleted
+        if delete_article_which_sps_pkg_is_missing:
+            # 1. Remoção por falta de sps_pkg
+            to_delete = articles.filter(sps_pkg__isnull=True)
+            if to_delete:
+                try:
+                    qtd_deleted, _ignored = cls.delete_related_items(to_delete)
+                    response["total_delete_article_which_sps_pkg_is_missing"] = qtd_deleted
+                    total_deletado += qtd_deleted
+                    # consulta novamente
+                    articles = cls.objects.filter(
+                        issue=issue, sps_pkg__isnull=False
+                    )
+                except Exception as e:
+                    exceptions.append({
+                        "action": "deleting due to missing sps_pkg",
+                        "exception": traceback.format_exc()
+                    })
 
-        # 1. Remoção por falta de pp_xml
-        qs = cls.objects.select_related("pp_xml").filter(issue=issue)
-        sps_pkg_names = []
-        article_ids = set()
-        for item in qs:
-            try:
-                xml_with_pre = item.pp_xml.xml_with_pre
-            except Exception:
-                article_ids.add(item.id)
-                if item.pp_xml:
-                    ppxml_to_delete.add(item.pp_xml.id)
-                if item.sps_pkg:
-                    sps_pkg_to_delete.add(item.sps_pkg.id)
-                    sps_pkg_names.append(item.sps_pkg.sps_pkg_name)
-        if article_ids:
-            response["ppxml_invalid"] = sps_pkg_names
-            qtd_deleted, _ignored = cls.delete_queryset(qs.filter(id__in=article_ids))
-            total_deletado += qtd_deleted
+        # vincula ao documento na coleção os artigos ainda não vinculados,
+        # para que os duplicados sejam avaliados por coleção
+        link_stats = {}
+        for article in articles.filter(collection_pid_v2__isnull=True):
+            result = article.complete_collection_pid_v2(user)
+            link_stats[result] = link_stats.get(result, 0) + 1
+        response["complete_collection_pid_v2"] = link_stats
 
-        # 2. Remoção por duplicidade
-        for field_name in ("sps_pkg__sps_pkg_name", "pid_v2"):
-            response.setdefault(f"repeated_{field_name}", [])
-            qs = cls.objects.select_related("journal").filter(issue=issue)
-            
-            multiple_values = cls.get_repeated_values(field_name, qs)
-            
+        if delete_article_which_is_duplicated:
+            # 2. Remoção por duplicidade
+            duplicated_items = []
+            # pid_v3 repetido na mesma coleção
+            multiple_values = cls.get_repeated_values(
+                "pid_v3",
+                articles,
+                other_field_names=["collection_pid_v2__collection_id"],
+            )
+            total_delete_article_which_is_duplicated = 0
             for value in list(multiple_values or []):
-                
-                # Filtra os registros que possuem este valor específico duplicado
-                duplicados = qs.filter(**{field_name: value}).order_by("-updated")
-                
-                if not duplicados.exists():
-                    continue
-                
-                # Define o fallback (mais recente) caso nenhum seja válido na API
-                keep = duplicados.first()
-                
-                for item in duplicados:
-                    try:
-                        item.create_or_update_article_collections(user, force_update=True)
-                        item.check_availability(user, force_update=True, timeout=timeout)
-                        for coll in item.article_collections:
-                            response = item.available_on_public_website(coll.collection)
-                            events.append(_("Checking {} is available. Result: {}").format(item, response))
-                            
-                            if response.get("valid"):
-                                keep = item
-                                break
-                    except Exception as e:
-                        exceptions.append(_("Checking {} is available. Result: {}").format(item, e))
-                
-                # Separa os que serão deletados
-                remover_qs = duplicados.exclude(id=keep.id)
-                
-                if remover_qs.exists():
-                    sps_pkg_names = []
-                    for pp_xml_id, sps_pkg_name, sps_pkg_id in remover_qs.values_list("pp_xml_id", "sps_pkg__sps_pkg_name", "sps_pkg_id"):
-                        if pp_xml_id:
-                            ppxml_to_delete.add(pp_xml_id)
-                        if sps_pkg_id:
-                            sps_pkg_to_delete.add(sps_pkg_id)
-                            sps_pkg_names.append(sps_pkg_name)
+                try:
+                    # Filtra os registros que possuem este valor específico duplicado
+                    pid_v3, collection_id = value
+                    articles_which_same_sps_pkg = articles.filter(
+                        pid_v3=pid_v3, collection_pid_v2__collection_id=collection_id
+                    ).order_by("-updated")
+
+                    articles_which_same_sps_pkg_list = list(articles_which_same_sps_pkg)
+                    data = {"value": value, "total": len(articles_which_same_sps_pkg_list)}
                     
-                    # Alimenta a chave dinâmica: "repeated_sps_pkg_name" ou "repeated_pid_v2"
-                    response[f"repeated_{field_name}"].append((value, sps_pkg_names))
-                    
+                    result = Article.duplicated_item_to_keep(user, timeout, articles_which_same_sps_pkg_list)
+                    data.update(result)
+
                     # Executa a deleção e soma ao totalizador
-                    qtd_deletada, _ignored = cls.delete_queryset(remover_qs)
-                    total_deletado += qtd_deletada
-
-        # Se você precisar retornar o total_deletado junto com o dicionário, 
-        # pode adicioná-lo ao dicionário ou retornar uma tupla. 
-        # Como o seu esqueleto final pedia apenas o retorno do dicionário, mantive assim:
-        if ppxml_to_delete:
-            try:
-                PidProviderXML.objects.filter(id__in=ppxml_to_delete).delete()
-            except Exception as e:
-                exceptions.append(str(e))
-                PidProviderXML.objects.filter(
-                    id__in=ppxml_to_delete, 
-                ).update(proc_status=PPXML_STATUS_INVALID)
-
-        if sps_pkg_to_delete:
-            try:
-                SPSPkg.objects.filter(id__in=sps_pkg_to_delete).delete()
-            except Exception as e:
-                exceptions.append(str(e))
-        
-        response["deleted_ppxml_ids"] = list(ppxml_to_delete)
-        response["deleted_sps_pkg_ids"] = list(sps_pkg_to_delete)
-        
-        qs = cls.objects.filter(Q(sps_pkg__isnull=True) | Q(pp_xml__isnull=True), issue=issue)
-        response["deleted_article_ids"] = list(qs.values_list("id", flat=True))
-        qtd_deleted, _ignored = cls.delete_queryset(qs)
-        total_deletado += qtd_deleted
-        
+                    qtd_deletada, _ignored = cls.delete_related_items(
+                        articles_which_same_sps_pkg.exclude(id=result["keep"])
+                    )
+                    total_delete_article_which_is_duplicated += qtd_deletada
+                    data["total_deleted"] = qtd_deletada
+                    duplicated_items.append(data)
+                except Exception as e:
+                    exceptions.append({
+                        "action": "removing duplicity",
+                        "item": value,
+                        "exception": traceback.format_exc()
+                    })
+            response["duplicated_items"] = duplicated_items
+            total_deletado += total_delete_article_which_is_duplicated
+            response["total_delete_article_which_is_duplicated"] = total_delete_article_which_is_duplicated
         response["total_deleted_items"] = total_deletado
-        response["events"] = events
         response["exceptions"] = exceptions
         return response
 
- 
+    @staticmethod
+    def duplicated_item_to_keep(user, timeout, duplicated_items):
+        # Define o fallback (mais recente) caso nenhum seja válido na API
+        keep = duplicated_items[0]
+        exceptions = []
+        # Verifica a disponibilidade do artigo
+        for item in duplicated_items:
+            try:
+                item.create_or_update_article_collections(user, force_update=True)
+                item.check_availability(user, force_update=True, timeout=timeout)
+                for coll in item.article_collections.all():
+                    page_status = item.available_on_public_website(coll.collection)
+                    if page_status.get("valid"):
+                        keep = item
+                        break
+            except Exception as e:
+                exceptions.append({
+                    "item": str(item),
+                    "exception": traceback.format_exc()
+                })
+        return {"keep": keep.id, "exceptions": exceptions}
+
+
 # ============================================================
 # Article DOI / Title / RelatedItem / RequestChange
 # ============================================================
@@ -1486,11 +1835,9 @@ class ArticleCollection(CommonControlField):
 
     def update_aggregate_status(self, user):
         """Recalcula status a partir das ArticleWebPage filhas."""
-        status_list = ArticleWebPage.objects.filter(
-            collection=self.collection,
-        ).values_list("status", flat=True)
-        
-        self.status = get_compiled_status(status_list)
+        status_list = self.pages.values_list("status", flat=True)
+
+        self.status = get_compiled_status(list(status_list))
         self.updated_by = user
         self.save(update_fields=["status", "updated_by"])
 
@@ -1517,10 +1864,13 @@ class ArticleCollection(CommonControlField):
     # ── Helpers de configuração ──
 
     def is_stale(self):
-        """Detecta páginas ausentes ou configuração habilitada mais recente."""
+        """
+        Indica se a WebSiteConfiguration vigente da coleção foi
+        alterada após a última reconstrução das páginas deste
+        ArticleCollection, ou se ele ainda não possui páginas.
+        """
         if not self.pages.exists():
             return True
-
         latest_config_update = WebSiteConfiguration.objects.filter(
             collection=self.collection, enabled=True
         ).aggregate(Max("updated"))["updated__max"]
@@ -1548,6 +1898,7 @@ class ArticleCollection(CommonControlField):
         """
         article = self.article
         existing_ids = set()
+        journal_acron = article.journal.get_acron(self.collection)
 
         # ── Websites novos (QA / PUBLIC) ──
         for ws_config in WebSiteConfiguration.objects.filter(
@@ -1555,7 +1906,13 @@ class ArticleCollection(CommonControlField):
             enabled=True,
         ):
             purpose = ws_config.purpose  # "PUBLIC" ou "QA"
-            for item in article.get_webpage_items(ws_config.url, purpose):
+            self.pages.filter(purpose=purpose).exclude(
+                url__startswith=ws_config.url
+            ).delete()
+
+            for item in article.get_webpage_items(
+                ws_config.url, purpose, journal_acron
+            ):
                 page = ArticleWebPage.get_or_create_from_item(
                     user, self.article, self.collection, item
                 )
@@ -1565,6 +1922,9 @@ class ArticleCollection(CommonControlField):
         classic_ws = self.classic_website
         if classic_ws and classic_ws.url:
             purpose = choices.ARTICLE_WEBPAGE_PURPOSE_CLASSIC
+            self.pages.filter(purpose=purpose).exclude(
+                url__startswith=classic_ws.url
+            ).delete()
             for item in article.get_html_urls(
                 classic_ws.url, purpose
             ):
@@ -1586,6 +1946,8 @@ class ArticleCollection(CommonControlField):
         # Remove páginas órfãs
         self.pages.exclude(id__in=existing_ids).delete()
 
+        # Marca o momento da reconstrução, usado por is_stale() para
+        # detectar automaticamente futuras mudanças de WebSiteConfiguration
         self.save(update_fields=["updated"])
 
     @property

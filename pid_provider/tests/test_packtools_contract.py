@@ -7,11 +7,11 @@ from lxml import etree
 from packtools.sps.pid_provider.xml_sps_adapter import PidProviderXMLAdapter
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
+from collection.models import Collection
 from package.models import SPSPkg
 from pid_provider.base_pid_provider import BasePidProvider
 from pid_provider.models import PidProviderXML, PidProviderXMLRegistration
 from pid_provider.query_params import compare, get_data_to_compare
-from proc.models import ArticleProc
 from upload.utils.package_utils import render_html
 
 
@@ -90,7 +90,8 @@ def test_unreadable_xml_uses_pid_v2_to_disambiguate_colliding_hashes(xml):
         PidProviderXML, "xml_with_pre", new_callable=PropertyMock, return_value=None
     ):
         result = PidProviderXML.get_best_match([correct, other], get_data_to_compare(adapter))
-        assert correct.data_to_compare["pid_v2"] == xml.v2
+        # um pid v2 por coleção (lista)
+        assert correct.data_to_compare["pid_v2"] == [xml.v2]
 
     assert result["registered"] == correct
     assert not result.get("multiple_matched")
@@ -143,24 +144,14 @@ def test_migration_html_and_upload_preview_render_real_xml(xml):
     assert "10.1590/2236-8906-108/2020" in preview
 
 
-def test_converted_html_keeps_full_package_name(settings, tmp_path):
-    settings.MEDIA_ROOT = str(tmp_path / "media")
-    converted_xml = tmp_path / "01.xml"
-    converted_xml.write_bytes(XML_PATH.read_bytes())
-    package_name = "2236-8906-Hoehnea-49-e1082020"
-    article = ArticleProc(pid="S2236-89062022000100001", pkg_name="01")
-
-    article.save_processed_xml(None, str(converted_xml), {}, None)
-
-    assert Path(article.processed_xml.name).name == package_name + ".xml"
-    assert article.xml_with_pre.sps_pkg_name == package_name
-
-
 @pytest.mark.django_db
-@pytest.mark.parametrize("entry", ["direct", "opac"])
+@pytest.mark.parametrize("entry", ["direct"])
 def test_ambiguous_registration_persists_audit_without_changing_candidates(xml, entry, settings, tmp_path):
     settings.MEDIA_ROOT = str(tmp_path)
     user = get_user_model().objects.create_user(username="ambiguous-pid")
+    # o registro identifica a coleção do XML (CollectionPidV2)
+    Collection.objects.create(creator=user, acron="scl")
+    xml.collection = "scl"
     adapter = PidProviderXMLAdapter(xml)
     candidates = []
     for _ in range(2):

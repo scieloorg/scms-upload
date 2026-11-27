@@ -186,11 +186,12 @@ def task_check_article_availability(
         for journal_proc in JournalProc.objects.filter(
             journal_query, journal__isnull=False
         ):
-            if not journal_proc.journal.journal_acron:
-                journal_proc.journal.journal_acron = journal_proc.acron
-                journal_proc.journal.save()
             for article in Article.objects.filter(
-                article_query, journal=journal_proc.journal
+                article_query,
+                # sem coleção: artigo anterior à separação por coleção
+                Q(collection_pid_v2__collection=journal_proc.collection)
+                | Q(collection_pid_v2__isnull=True),
+                journal=journal_proc.journal,
             ):
                 for item in WebSiteConfiguration.objects.filter(
                     enabled=True, collection=journal_proc.collection
@@ -198,6 +199,7 @@ def task_check_article_availability(
                     process_article_availability.apply_async(
                         kwargs=dict(
                             pid_v3=article.pid_v3,
+                            collection_acron=journal_proc.collection.acron,
                             user_id=user_id,
                             username=username,
                             domain=item.url,
@@ -222,10 +224,18 @@ def process_article_availability(
     user_id,
     username,
     timeout=None,
+    collection_acron=None,
 ):
     try:
         user = _get_user(user_id=user_id, username=username)
-        article = Article.objects.get(pid_v3=pid_v3)
+        # um Article por coleção
+        article = (
+            collection_acron
+            and Article.objects.filter(
+                pid_v3=pid_v3,
+                collection_pid_v2__collection__acron=collection_acron,
+            ).first()
+        ) or Article.get_by_pid_v3(pid_v3)
         logging.info(f"{domain} {pid_v3}")
         obj = ArticleAvailability.create_or_update(user, article)
         obj.create_or_update_urls(user, website_url=domain, timeout=timeout)
@@ -271,7 +281,7 @@ def retry_failed_scielo_urls(
 def fetch_data_and_register_result(self, pid_v3, url, username, user_id):
     try:
         user = _get_user(user_id=user_id, username=username)
-        article = Article.objects.get(pid_v3=pid_v3)
+        article = Article.get_by_pid_v3(pid_v3)
         ScieloURLStatus.create_or_update(
             user=user,
             article=article,

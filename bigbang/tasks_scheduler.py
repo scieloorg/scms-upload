@@ -49,6 +49,12 @@ PRESS_RELEASE_PRIORITY = 1
 
 REPUBLISH_ARTICLES_MINUTES = MINUTES[10]
 REPUBLISH_ARTICLES_PRIORITY = 4
+DATA_AVAILABILITY_STATUS_MINUTES = MINUTES[10]
+DATA_AVAILABILITY_STATUS_PRIORITY = 9
+COMPLETE_NETWORK_CLASSIFICATION_MINUTES = MINUTES[10]
+COMPLETE_NETWORK_CLASSIFICATION_PRIORITY = 1
+COMPLETE_COLLECTION_PID_V2_MINUTES = MINUTES[10]
+COMPLETE_COLLECTION_PID_V2_PRIORITY = 9
 
 TITLE_DB_MIGRATION_PRIORITY = 0
 ISSUE_DB_MIGRATION_PRIORITY = 0
@@ -68,8 +74,6 @@ HTML_TO_XMLS_PRIORITY = 9
 GENERATE_SPS_PACKAGES_PRIORITY = 8
 
 SINCHRONIZE_TO_PID_PROVIDER_PRIORITY = 5
-
-
 
 MIGRATION_PRIORITY = ISSUE_DB_MIGRATION_PRIORITY + 1
 
@@ -115,6 +119,9 @@ def schedule_subtasks(username):
     enabled = False
     _schedule_fetch_and_create_journal(username, enabled)  # Nova tarefa adicionada
     _schedule_try_fetch_and_register_press_release(username, enabled)
+    _schedule_update_data_availability_status(username, enabled)
+    _schedule_complete_network_classification(username, enabled)
+    _schedule_complete_collection_pid_v2(username, enabled)
 
 
 def _schedule_check_article_availability(username, enabled=False):
@@ -207,7 +214,11 @@ def _schedule_migrate_and_publish_journals(username, enabled):
             journal_acron=None,
             force_update=False,
             status=[],
+            # valid_status não tem efeito: é apenas um lembrete dos valores
+            # aceitos em status (ex.: status=["BLOCKED"] reprocessa os bloqueados)
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
+            force_import_acron_id_file=False,
+            force_core_sync=False,
         ),
         description=_("Migra e publica os periódicos"),
         priority=TITLE_DB_MIGRATION_PRIORITY,
@@ -234,6 +245,8 @@ def _schedule_migrate_and_publish_issues(username, enabled):
             publication_year=None,
             issue_folder=None,
             status=[],
+            # valid_status não tem efeito: é apenas um lembrete dos valores
+            # aceitos em status (ex.: status=["BLOCKED"] reprocessa os bloqueados)
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
         ),
@@ -258,12 +271,20 @@ def _schedule_migrate_and_publish_articles(username, enabled):
             publication_year=None,
             issue_folder=None,
             status=[],
+            # valid_status não tem efeito: é apenas um lembrete dos valores
+            # aceitos em status (ex.: status=["BLOCKED"] reprocessa os bloqueados)
             valid_status=["REPROC", "TODO", "DOING", "DONE", "PENDING", "BLOCKED"],
             force_update=False,
             force_import_acron_id_file=False,
             force_migrate_document_records=False,
             force_migrate_document_files=False,
             skip_migrate_pending_document_records=False,
+            delete_article_which_is_duplicated=True,
+            delete_article_which_sps_pkg_is_missing=True,
+            delete_sps_pkg_which_is_duplicated=True,
+            delete_sps_pkg_which_ppx_is_missing=True,
+            delete_article_procs_which_sps_pkg_is_missing=True,
+            delete_article_procs_which_is_duplicated=True,
         ),
         description=_("Migra e publica artigos"),
         priority=ARTICLE_DB_MIGRATION_PRIORITY,
@@ -396,6 +417,29 @@ def _schedule_fetch_and_create_journal(username, enabled=False):
     )
 
 
+def _schedule_complete_network_classification(username, enabled=False):
+    """
+    Agenda a tarefa de preencher network_classification das coleções
+    que estão sem esse dado (necessário para identificar a coleção
+    principal de periódicos presentes em mais de uma coleção)
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="collection.tasks.task_complete_network_classification",
+        name="complete_network_classification",
+        kwargs=dict(
+            username=username,
+        ),
+        description=_("Completa a classificação de rede das coleções"),
+        priority=COMPLETE_NETWORK_CLASSIFICATION_PRIORITY,
+        enabled=enabled,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute=COMPLETE_NETWORK_CLASSIFICATION_MINUTES,
+    )
+
+
 def _schedule_try_fetch_and_register_press_release(username, enabled=False):
     """
     Agenda a tarefa de buscar e registrar press releases
@@ -443,4 +487,63 @@ def _schedule_republish_articles(username, enabled=False):
         day_of_week="*",
         hour="*",
         minute=REPUBLISH_ARTICLES_MINUTES,
+    )
+
+
+def _schedule_update_data_availability_status(username, enabled=False):
+    """
+    Agenda a tarefa de extrair data_availability_status do XML
+    dos artigos já carregados
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="article.tasks.task_update_data_availability_status",
+        name="task_update_data_availability_status",
+        kwargs=dict(
+            collection_acron=None,
+            journal_acron=None,
+            publication_year=None,
+            force_update=False,
+            batch_size=None,
+        ),
+        description=_("Extract data availability status of loaded articles"),
+        priority=DATA_AVAILABILITY_STATUS_PRIORITY,
+        enabled=enabled,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute=DATA_AVAILABILITY_STATUS_MINUTES,
+    )
+
+
+def _schedule_complete_collection_pid_v2(username, enabled=False):
+    """
+    Agenda a tarefa que vincula aos documentos na coleção
+    (collection_pid_v2), aos poucos, os SPSPkg e Article anteriores à
+    separação por coleção. Executa uma vez: a própria tarefa agenda o
+    lote seguinte (countdown) até terminar; ajustar batch_size e countdown
+    conforme a carga. Para retomar, informar model_name e last_id.
+    Deixa a tarefa desabilitada por padrão
+    """
+    schedule_task(
+        task="article.tasks.task_complete_collection_pid_v2",
+        name="task_complete_collection_pid_v2",
+        kwargs=dict(
+            username=username,
+            model_name="SPSPkg",
+            last_id=0,
+            batch_size=100,
+            countdown=30,
+            max_batches=None,
+            auto_continue=True,
+        ),
+        description=_(
+            "Vincula SPSPkg e Article legados ao documento na coleção (collection_pid_v2)"
+        ),
+        priority=COMPLETE_COLLECTION_PID_V2_PRIORITY,
+        enabled=enabled,
+        run_once=True,
+        day_of_week="*",
+        hour="*",
+        minute=COMPLETE_COLLECTION_PID_V2_MINUTES,
     )

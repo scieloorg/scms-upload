@@ -17,7 +17,17 @@ SOURCE_TASKS = (
 def test_migration_removes_obsolete_sources_without_discarding_legacy_records(state):
     executor = MigrationExecutor(connection)
     current_targets = executor.loader.graph.leaf_nodes()
-    previous_targets = [item for item in current_targets if item[0] != "pid_provider"] + [PREVIOUS]
+    graph = executor.loader.graph
+    # migrações de pid_provider posteriores a PREVIOUS; folhas de outras apps
+    # que dependem delas (ex.: article -> CollectionPidV2) também retrocedem
+    later = set(graph.forwards_plan(("pid_provider", graph.leaf_nodes("pid_provider")[0][1])))
+    later -= set(graph.forwards_plan(PREVIOUS))
+    later = {node for node in later if node[0] == "pid_provider"}
+    previous_targets = [PREVIOUS] + [
+        item
+        for item in current_targets
+        if item[0] != "pid_provider" and not (set(graph.forwards_plan(item)) & later)
+    ]
     executor.migrate(previous_targets)
     apps = executor.loader.project_state(previous_targets).apps
     xmlurl = apps.get_model("pid_provider", "XMLURL")

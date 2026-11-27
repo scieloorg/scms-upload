@@ -343,11 +343,53 @@ class Journal(CommonControlField, ClusterableModel):
             .order_by("name")
         )
 
+    def _get_journal_proc_acrons(self):
+        return (
+            self.journalproc_set.filter(acron__isnull=False)
+            .exclude(acron="")
+            .values_list("acron", flat=True)
+        )
+
+    def get_acron(self, collection=None):
+        """
+        Retorna o acrônimo do periódico.
+
+        journal_acron só é preenchido quando o acrônimo é o mesmo em todas
+        as coleções (ver update_journal_acron). Caso contrário, o acrônimo
+        deve ser obtido de JournalProc, que depende da coleção.
+        """
+        items = self._get_journal_proc_acrons()
+        if collection:
+            return items.filter(collection=collection).first() or self.journal_acron
+        return self.journal_acron or items.first()
+
+    def update_journal_acron(self, save=True):
+        """
+        Preenche journal_acron somente se o acrônimo for o mesmo em todas
+        as coleções (JournalProc). Se houver acrônimos diferentes,
+        deixa journal_acron vazio, forçando a busca em JournalProc.
+        """
+        acrons = set(self._get_journal_proc_acrons())
+        if not acrons:
+            return self.journal_acron
+        journal_acron = acrons.pop() if len(acrons) == 1 else None
+        if journal_acron != self.journal_acron:
+            self.journal_acron = journal_acron
+            if save:
+                self.save(update_fields=["journal_acron"])
+        return self.journal_acron
+
     @property
     def first_letters(self):
+        acron = self.get_acron()
+        if acron:
+            return acron.upper()
+        title = self.short_title or (self.official_journal and self.official_journal.title_iso)
+        if not title:
+            raise ValueError("Journal.first_letters requires short_title or official_journal.title_iso")
         return "".join(
             word[0]
-            for word in (self.short_title or self.official_journal.title_iso).split()
+            for word in title.split()
         ).upper()
 
     @property
@@ -636,7 +678,7 @@ class Journal(CommonControlField, ClusterableModel):
     @property
     def missing_fields(self):
         """
-        Verifica campos não preenchidos no Journal e retorna um relatório detalhado.
+        Verifica ausência de campos relevantes para o site público
         """
         fields = {
             "title": _("Journal Title"),
@@ -649,11 +691,14 @@ class Journal(CommonControlField, ClusterableModel):
             "logo_url": _("Logo URL"),
             "license_code": _("License Code"),
             "wos_areas": _("WoS Areas"),
-            "journal_acron": _("Journal acronym"),
         }
         missing = []
         for field, description in fields.items():
-            value = getattr(self, field, None)
+            if field == "journal_acron":
+                # journal_acron fica vazio se o acrônimo varia por coleção
+                value = self.get_acron()
+            else:
+                value = getattr(self, field, None)
             if not value or (isinstance(value, str) and not value.strip()):
                 missing.append(description)
 

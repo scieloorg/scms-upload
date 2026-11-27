@@ -7,6 +7,7 @@ from mimetypes import types_map
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 from minio import Minio
+from minio.commonconfig import CopySource
 from minio.error import S3Error
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,15 @@ class MinioStorageSetBucketPolicyError(Exception): ...
 
 
 class MinioStorageNoSuchBucketError(Exception): ...
+
+
+class MinioStorageDeleteError(Exception): ...
+
+
+class MinioStorageMoveError(Exception): ...
+
+
+class MinioStorageCopyError(Exception): ...
 
 
 def _create_tmp_file(content=None):
@@ -291,6 +301,102 @@ class MinioStorage:
         """
         # https://docs.min.io/docs/python-client-api-reference.html#remove_object
         return self._client.remove_object(self.bucket, self.get_full_object_name(object_name))
+
+    def delete(self, object_name: str) -> None:
+        """
+        Apaga o objeto do Minio
+
+        Parameters
+        ----------
+        object_name : str
+            rota do arquivo no Minio (sem o prefixo object_name_prefix)
+
+        Raises
+        ------
+        MinioStorageDeleteError
+        """
+        try:
+            # https://min.io/docs/minio/linux/developers/python/API.html#remove_object
+            self._client.remove_object(
+                self.bucket, self.get_full_object_name(object_name)
+            )
+        except Exception as e:
+            raise MinioStorageDeleteError(
+                "Unable to delete %s %s %s" % (object_name, type(e), e)
+            )
+
+    def move(self, source_object_name: str, target_object_name: str) -> str:
+        """
+        Move o objeto para outra rota no mesmo bucket: copia para o
+        destino e, somente se a cópia foi bem sucedida, apaga a origem.
+        Retorna o URI do objeto no destino.
+
+        Parameters
+        ----------
+        source_object_name : str
+            rota atual do arquivo no Minio (sem o prefixo object_name_prefix)
+        target_object_name : str
+            nova rota do arquivo no Minio (sem o prefixo object_name_prefix)
+
+        Returns
+        -------
+        str
+
+        Raises
+        ------
+        MinioStorageMoveError
+            se a cópia falhar (a origem é mantida)
+        MinioStorageDeleteError
+            se a cópia foi feita, mas a origem não pôde ser apagada
+            (o objeto fica nas duas rotas)
+        """
+        if source_object_name == target_object_name:
+            return self.get_uri(target_object_name)
+        try:
+            uri = self.copy(source_object_name, target_object_name)
+        except MinioStorageCopyError as e:
+            raise MinioStorageMoveError(
+                "Unable to move %s to %s %s"
+                % (source_object_name, target_object_name, e)
+            )
+        self.delete(source_object_name)
+        return uri
+
+    def copy(self, source_object_name: str, target_object_name: str) -> str:
+        """
+        Copia o objeto para outra rota no mesmo bucket, mantendo a origem.
+        Retorna o URI do objeto no destino.
+
+        Parameters
+        ----------
+        source_object_name : str
+            rota atual do arquivo no Minio (sem o prefixo object_name_prefix)
+        target_object_name : str
+            rota da cópia no Minio (sem o prefixo object_name_prefix)
+
+        Returns
+        -------
+        str
+
+        Raises
+        ------
+        MinioStorageCopyError
+        """
+        if source_object_name == target_object_name:
+            return self.get_uri(target_object_name)
+        try:
+            # https://min.io/docs/minio/linux/developers/python/API.html#copy_object
+            self._client.copy_object(
+                self.bucket,
+                self.get_full_object_name(target_object_name),
+                CopySource(self.bucket, self.get_full_object_name(source_object_name)),
+            )
+        except Exception as e:
+            raise MinioStorageCopyError(
+                "Unable to copy %s to %s %s %s"
+                % (source_object_name, target_object_name, type(e), e)
+            )
+        return self.get_uri(target_object_name)
 
     def fget(self, object_name, downloaded_file_path=None):
         """

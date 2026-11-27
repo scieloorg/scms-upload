@@ -5242,3 +5242,10 @@ msgstr "Unsafe package path."
 
 msgid "Unsupported change type."
 msgstr "Unsupported change type."
+#: upload/wagtail_hooks.py:693
+msgid "Error management"
+msgstr "Error management"
+
+#: article/templates/article/report/data_availability.html:43
+msgid "Clear"
+msgstr "Clear"

@@ -29,7 +29,10 @@ class City(CommonControlField):
     @classmethod
     def get(cls, name):
         if name:
-            return cls.objects.get(name=name)
+            try:
+                return cls.objects.get(name=name)
+            except cls.MultipleObjectsReturned:
+                return cls.objects.filter(name=name).order_by("id").first()
 
     @classmethod
     def get_or_create(cls, user, name):
@@ -243,7 +246,14 @@ class Location(CommonControlField):
 
     @classmethod
     def get(cls, country, state, city):
-        return cls.objects.get(country=country, state=state, city=city)
+        try:
+            return cls.objects.get(country=country, state=state, city=city)
+        except cls.MultipleObjectsReturned:
+            return (
+                cls.objects.filter(country=country, state=state, city=city)
+                .order_by("id")
+                .first()
+            )
 
     @classmethod
     def create(cls, user, country, state, city):

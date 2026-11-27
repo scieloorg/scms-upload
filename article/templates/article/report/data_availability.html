@@ -1,0 +1,145 @@
+{% extends "report/base.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Data availability report" %}{% endblock %}
+
+{% block content %}
+  <h1>{% translate "Data availability report" %}</h1>
+  <p class="desc">
+    {% translate "Articles by data availability status, per year. The online publication date filter applies to the article's first online publication date, which may differ from the issue year shown in the bibliographic strip." %}
+  </p>
+
+  <form method="get" id="report-filters" data-options-url="{% url 'report_data_availability_options' %}">
+    <label>{% translate "Collection" %}
+      <select name="collection" id="filter-collection">
+        <option value="">{% translate "All" %}</option>
+        {% for c in collections %}
+          <option value="{{ c.acron }}" {% if c.acron == filters.collection %}selected{% endif %}>{{ c.acron }}{% if c.name %} – {{ c.name }}{% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>{% translate "Journal" %}
+      <select name="journal" id="filter-journal">
+        <option value="">{% translate "All" %}</option>
+        {% for j in journals %}
+          <option value="{{ j.id }}" {% if j.id|stringformat:"s" == filters.journal %}selected{% endif %}>{{ j }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>{% translate "Online publication from" %}
+      <input type="date" name="pub_date_from" id="filter-pub-date-from" value="{{ filters.pub_date_from }}" min="{{ pub_date_min }}" max="{{ pub_date_max }}">
+    </label>
+    <label>{% translate "Online publication to" %}
+      <input type="date" name="pub_date_to" id="filter-pub-date-to" value="{{ filters.pub_date_to }}" min="{{ pub_date_min }}" max="{{ pub_date_max }}">
+    </label>
+    <label>{% translate "Group by" %}
+      <select name="group_by">
+        {% for value, label in group_by_options %}
+          <option value="{{ value }}" {% if value == filters.group_by %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">{% translate "Filter" %}</button>
+    <a class="btn secondary" href="?">{% translate "Clear" %}</a>
+    <a class="btn secondary" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}format=csv">CSV</a>
+  </form>
+
+  {% if report.totals.total %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="year" rowspan="2">{% translate "Year" %}</th>
+          {% for status, label in report.columns %}
+            <th colspan="2">{{ label }}</th>
+          {% endfor %}
+          <th rowspan="2">{% translate "Total" %}</th>
+        </tr>
+        <tr>
+          {% for status, label in report.columns %}
+            <th>n</th><th>%</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in report.rows %}
+        <tr>
+          <td class="year">{{ row.year|default:_("No year") }}</td>
+          {% for cell in row.cells %}
+            <td>{{ cell.count }}</td><td class="pct">{{ cell.percent|floatformat:2 }}</td>
+          {% endfor %}
+          <td>{{ row.total }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="total">
+          <td class="year">{% translate "Total" %}</td>
+          {% for cell in report.totals.cells %}
+            <td>{{ cell.count }}</td><td class="pct">{{ cell.percent|floatformat:2 }}</td>
+          {% endfor %}
+          <td>{{ report.totals.total }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="table-wrap"><div class="empty">{% translate "No articles found for the selected filters." %}</div></div>
+  {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // filtros em cascata: coleção -> periódicos; coleção + periódico -> datas
+  (function () {
+    var form = document.getElementById("report-filters");
+    var collection = document.getElementById("filter-collection");
+    var journal = document.getElementById("filter-journal");
+    var dateFrom = document.getElementById("filter-pub-date-from");
+    var dateTo = document.getElementById("filter-pub-date-to");
+    var allLabel = journal.options[0].text;
+
+    function setDateRange(input, min, max) {
+      input.min = min;
+      input.max = max;
+      // limpa valor fora do intervalo para não bloquear o envio do formulário
+      if (input.value && ((min && input.value < min) || (max && input.value > max))) {
+        input.value = "";
+      }
+    }
+
+    function updateOptions(reloadJournals) {
+      var params = new URLSearchParams();
+      if (collection.value) params.set("collection", collection.value);
+      if (journal.value) params.set("journal", journal.value);
+      form.setAttribute("aria-busy", "true");
+      return fetch(form.dataset.optionsUrl + "?" + params.toString())
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+          if (reloadJournals) {
+            var selected = journal.value;
+            journal.innerHTML = "";
+            journal.add(new Option(allLabel, ""));
+            data.journals.forEach(function (item) {
+              journal.add(new Option(item.label, item.id, false, String(item.id) === selected));
+            });
+            if (journal.value !== selected) {
+              // periódico selecionado não pertence à coleção: recalcula datas
+              return updateOptions(false);
+            }
+          }
+          setDateRange(dateFrom, data.pub_date_min, data.pub_date_max);
+          setDateRange(dateTo, data.pub_date_min, data.pub_date_max);
+        })
+        .catch(function (error) { console.error(error); })
+        .finally(function () { form.removeAttribute("aria-busy"); });
+    }
+
+    collection.addEventListener("change", function () { updateOptions(true); });
+    journal.addEventListener("change", function () { updateOptions(false); });
+    dateFrom.addEventListener("change", function () { dateTo.min = dateFrom.value || dateFrom.min; });
+    dateTo.addEventListener("change", function () { dateFrom.max = dateTo.value || dateTo.max; });
+  })();
+</script>
+<style>
+  form[aria-busy="true"] select, form[aria-busy="true"] input { opacity: .6; }
+</style>
+{% endblock %}

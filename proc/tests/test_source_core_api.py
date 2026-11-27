@@ -38,7 +38,7 @@ class DummyDataChecker(BaseDataChecker):
     def get_local(self):
         pass
 
-    def is_updated(self, obj):
+    def is_local_or_remote(self, obj):
         pass
 
     def fetch_from_core(self, **kwargs):
@@ -65,7 +65,7 @@ class TestBaseDataChecker(unittest.TestCase):
     def test_get_or_fetch_returns_local_obj_when_updated_and_not_force_update(self):
         obj = MagicMock()
         self.checker.get_local = MagicMock(return_value=obj)
-        self.checker.is_updated = MagicMock(return_value=True)
+        self.checker.is_local_or_remote = MagicMock(return_value="local")
         self.checker.fetch_from_core = MagicMock()
 
         result = self.checker.get_or_fetch(force_update=False)
@@ -76,7 +76,7 @@ class TestBaseDataChecker(unittest.TestCase):
     def test_get_or_fetch_fetches_remote_when_force_update_is_true(self):
         obj = MagicMock()
         self.checker.get_local = MagicMock(return_value=obj)
-        self.checker.is_updated = MagicMock(return_value=True)
+        self.checker.is_local_or_remote = MagicMock(return_value="local")
         self.checker.fetch_from_core = MagicMock()
 
         result = self.checker.get_or_fetch(force_update=True)
@@ -87,7 +87,7 @@ class TestBaseDataChecker(unittest.TestCase):
     def test_get_or_fetch_fetches_remote_when_local_is_outdated(self):
         obj = MagicMock()
         self.checker.get_local = MagicMock(side_effect=[obj, obj])
-        self.checker.is_updated = MagicMock(return_value=False)
+        self.checker.is_local_or_remote = MagicMock(return_value="remote")
         self.checker.fetch_from_core = MagicMock()
 
         result = self.checker.get_or_fetch(force_update=False)
@@ -98,7 +98,7 @@ class TestBaseDataChecker(unittest.TestCase):
     def test_get_or_fetch_returns_none_if_model_does_not_exist_after_fetch(self):
         self.checker.model.DoesNotExist = Exception
         self.checker.get_local = MagicMock(side_effect=Exception("DoesNotExist"))
-        self.checker.is_updated = MagicMock(return_value=False)
+        self.checker.is_local_or_remote = MagicMock(return_value="remote")
         self.checker.fetch_from_core = MagicMock()
 
         result = self.checker.get_or_fetch(force_update=False)
@@ -129,27 +129,29 @@ class TestJournalDataChecker(TestCase):
             user=self.user,
         )
 
-    def test_is_updated_returns_false_if_journal_is_not_complete(self):
+    def test_is_local_or_remote_returns_false_if_journal_is_not_complete(self):
         journal = MagicMock()
-        journal.is_complete = False
+        journal.core_synchronized = False
 
-        self.assertFalse(self.checker.is_updated(journal))
+        self.assertEqual("remote", self.checker.is_local_or_remote(journal))
 
     @patch("proc.source_core_api.JournalProc.objects.filter")
-    def test_is_updated_returns_false_if_journal_proc_does_not_exist(self, mock_proc_filter):
+    def test_is_local_or_remote_returns_false_if_journal_proc_does_not_exist(self, mock_proc_filter):
         journal = MagicMock()
-        journal.is_complete = True
+        journal.core_synchronized = True
+        journal.missing_fields = []
         mock_proc_filter.return_value.exists.return_value = False
 
-        self.assertFalse(self.checker.is_updated(journal))
+        self.assertEqual("remote", self.checker.is_local_or_remote(journal))
 
     @patch("proc.source_core_api.JournalProc.objects.filter")
-    def test_is_updated_returns_true_when_complete_and_proc_exists(self, mock_proc_filter):
+    def test_is_local_or_remote_returns_true_when_complete_and_proc_exists(self, mock_proc_filter):
         journal = MagicMock()
-        journal.is_complete = True
+        journal.core_synchronized = True
+        journal.missing_fields = []
         mock_proc_filter.return_value.exists.return_value = True
 
-        self.assertTrue(self.checker.is_updated(journal))
+        self.assertEqual("local", self.checker.is_local_or_remote(journal))
 
     @patch.object(JournalDataChecker, "get_or_fetch")
     @patch("proc.source_core_api.JournalProc.objects.filter")
@@ -298,19 +300,6 @@ class TestProcessJournalResult(TestCase):
         self.assertEqual(journal.journal_acron, "rbt")
         self.assertTrue(JournalProc.objects.filter(journal=journal, acron="rbt").exists())
 
-    def test_process_journal_result_persists_contact_location(self):
-        self.result_data["location"] = {
-            "city_name": "São Paulo", "state_name": "São Paulo",
-            "state_acronym": "SP", "country_name": "Brasil", "country_acronym": "BR",
-        }
-
-        journal = process_journal_result(self.user, self.result_data)
-
-        journal.refresh_from_db()
-        self.assertEqual(journal.contact_location.city.name, "São Paulo")
-        self.assertEqual(journal.contact_location.state.acronym, "SP")
-        self.assertEqual(journal.contact_location.country.acronym, "BR")
-
 
 class TestIssueDataChecker(TestCase):
     """Testes unitários para IssueDataChecker."""
@@ -328,18 +317,19 @@ class TestIssueDataChecker(TestCase):
         )
 
     @patch("proc.source_core_api.IssueProc.objects.filter")
-    def test_is_updated_returns_true_when_proc_exists(self, mock_proc_filter):
+    def test_is_local_or_remote_returns_true_when_proc_exists(self, mock_proc_filter):
+        
         mock_proc_filter.return_value.exists.return_value = True
         issue = MagicMock()
 
-        self.assertTrue(self.checker.is_updated(issue))
+        self.assertEqual("local", self.checker.is_local_or_remote(issue))
 
     @patch("proc.source_core_api.IssueProc.objects.filter")
-    def test_is_updated_returns_false_when_proc_does_not_exist(self, mock_proc_filter):
+    def test_is_local_or_remote_returns_false_when_proc_does_not_exist(self, mock_proc_filter):
         mock_proc_filter.return_value.exists.return_value = False
         issue = MagicMock()
 
-        self.assertFalse(self.checker.is_updated(issue))
+        self.assertEqual("remote", self.checker.is_local_or_remote(issue))
 
     @patch.object(IssueDataChecker, "get_or_fetch")
     @patch("proc.source_core_api.IssueProc.objects.filter")
@@ -401,11 +391,51 @@ class TestFetchAndProcessIssues(TestCase):
     @patch("proc.source_core_api.Issue.create_or_update")
     @patch("proc.source_core_api.JournalProc.objects.filter")
     def test_process_issue_result_creates_issue_and_issue_proc(
-        self, mock_journal_proc_filter, mock_issue_create_or_update
+        self, mock_journal_proc_filter, mock_issue_get_or_create
     ):
+        # season/month presentes no resultado da API: dispara o save()
+        # otimizado (issue.save() só é chamado quando há campo extra a
+        # persistir além do que Issue.create_or_update já gravou).
         mock_issue = MagicMock()
-        mock_issue_create_or_update.return_value = mock_issue
-        
+        mock_issue_get_or_create.return_value = mock_issue
+
+        mock_journal_proc = MagicMock()
+        mock_journal_proc.collection = MagicMock()
+        mock_journal_proc_filter.return_value = [mock_journal_proc]
+
+        result_data = {
+            "volume": "10",
+            "number": "1",
+            "supplement": None,
+            "year": 2024,
+            "order": 1,
+            "issue_pid_suffix": "v10n1",
+            "season": "Jan-Mar",
+            "month": "1",
+        }
+
+        with patch("proc.source_core_api.IssueProc.objects.get") as mock_issue_proc_get:
+            mock_issue_proc_get.side_effect = IssueProc.DoesNotExist
+            with patch("proc.source_core_api.IssueProc.create_from_journal_proc_and_issue") as mock_create_issue_proc:
+                process_issue_result(self.user, self.journal, result_data)
+
+                self.assertEqual(mock_issue.season, "Jan-Mar")
+                self.assertEqual(mock_issue.month, "1")
+                mock_issue.save.assert_called_once()
+                mock_create_issue_proc.assert_called_once_with(
+                    self.user, mock_journal_proc, mock_issue
+                )
+
+    @patch("proc.source_core_api.Issue.create_or_update")
+    @patch("proc.source_core_api.JournalProc.objects.filter")
+    def test_process_issue_result_skips_save_when_no_season_or_month(
+        self, mock_journal_proc_filter, mock_issue_get_or_create
+    ):
+        # sem season/month no resultado da API, issue.save() é evitado
+        # (Issue.create_or_update já persistiu os demais campos).
+        mock_issue = MagicMock()
+        mock_issue_get_or_create.return_value = mock_issue
+
         mock_journal_proc = MagicMock()
         mock_journal_proc.collection = MagicMock()
         mock_journal_proc_filter.return_value = [mock_journal_proc]

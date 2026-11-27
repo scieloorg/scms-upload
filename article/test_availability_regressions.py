@@ -40,7 +40,8 @@ class ArticlePageRebuildTests(TestCase):
 
         with patch.object(Article, "get_webpage_items", return_value=[item]) as pages:
             article.create_or_update_article_collections(user)
-            pages.assert_called_once_with(config.url, "QA")
+            # terceiro argumento: acrônimo do periódico na coleção (journal_acron)
+            pages.assert_called_once_with(config.url, "QA", None)
             article_collection = article.article_collections.get()
             WebSiteConfiguration.objects.create(
                 collection=collection, creator=user, enabled=False, purpose="PUBLIC"
@@ -51,7 +52,8 @@ class ArticlePageRebuildTests(TestCase):
             self.assertEqual(result, [article_collection])
 
             article.create_or_update_article_collections(user, force_update=True)
-            pages.assert_called_once_with(config.url, "QA")
+            # terceiro argumento: acrônimo do periódico na coleção (journal_acron)
+            pages.assert_called_once_with(config.url, "QA", None)
             ArticleWebPage.objects.create(
                 article=article,
                 collection=collection,

@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -111,7 +111,8 @@ class HTMLXMLMultipleObjectsReturnedTestCase(TestCase):
 
     def test_get_raises_does_not_exist_when_no_record_found(self):
         """Test that get() raises DoesNotExist when no record is found."""
-        mock_article = Mock(spec=MigratedArticle)
+        mock_article = MagicMock(spec=MigratedArticle)
+        mock_article._meta = MigratedArticle._meta  # Pass Django model compatibility check
         
         with self.assertRaises(HTMLXML.DoesNotExist):
             HTMLXML.get(migrated_article=mock_article)

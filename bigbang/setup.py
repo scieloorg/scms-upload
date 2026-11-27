@@ -23,7 +23,11 @@ def setup(user, file_path=None, config=None):
             raise FileNotFoundError(file_path)
 
     collection = Collection.get_or_create(
-        acron=data["collection_acron"], name=data["collection_name"], user=user
+        acron=data["collection_acron"],
+        name=data["collection_name"],
+        user=user,
+        platform_status=data.get("collection_platform_status"),
+        network_classification=data.get("collection_network_classification"),
     )
 
     config = data["classic_ws_config"]

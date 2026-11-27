@@ -3096,7 +3096,7 @@ class PidV2Generator:
 
     def get_issue_pid(self, user, journal, issue):
         if not issue:
-            checker = IssueDataChecker(
+            data_checker = IssueDataChecker(
                 journal=journal,
                 publication_year=self.xml_with_pre.pub_year,
                 volume=self.xml_with_pre.volume,
@@ -3104,5 +3104,5 @@ class PidV2Generator:
                 number=self.xml_with_pre.number,
                 user=user,
             )
-            issue = checker.ensure_proc_exists()
+            issue = data_checker.ensure_proc_exists(force_update=True)
         return IssueProc.get_issue_pid(issue)

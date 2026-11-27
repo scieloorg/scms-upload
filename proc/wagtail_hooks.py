@@ -3,7 +3,18 @@ from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.snippets.models import register_snippet
-from wagtail.snippets.views.snippets import SnippetViewSetGroup
+from django.contrib.auth import get_user_model
+from django.shortcuts import redirect
+from wagtail.permission_policies.base import BasePermissionPolicy
+from django.urls import reverse
+from wagtail.snippets.views.snippets import (
+    CreateView as SnippetCreateView,
+    EditView as SnippetEditView,
+    IndexView as SnippetIndexView,
+    InspectView as SnippetInspectView,
+    SnippetViewSet,
+    SnippetViewSetGroup,
+)
 
 from config.menu import get_menu_order
 from core.users.permission_policies import (
@@ -14,7 +25,7 @@ from core.views import CommonControlFieldViewSet
 from htmlxml.models import HTMLXML
 from package.models import SPSPkg
 
-from .models import ArticleProc, IssueProc, JournalProc, ProcReport
+from .models import ArticleProc, IssueProc, JournalProc, ProblemReport, ProcReport
 
 
 class HTMLXMLFilterSet(django_filters.FilterSet):
@@ -178,6 +189,26 @@ class HTMLXMLViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
     ]
 
 
+class SPSPkgFilterSet(django_filters.FilterSet):
+    has_ppx = django_filters.BooleanFilter(
+        field_name='ppx_id',
+        lookup_expr='isnull',
+        exclude=True,
+        label=_('Has pid provider xml')
+    )
+
+    class Meta:
+        model = SPSPkg
+        fields = [
+            'origin',
+            'registered_in_core',
+            'valid_texts',
+            'valid_components',
+            'is_public',
+            'has_ppx',
+        ]
+
+
 class SPSPkgViewSet(SuperuserOnlySnippetViewSetMixin, CommonControlFieldViewSet):
     model = SPSPkg
     menu_label = _("SPS Package")
@@ -186,6 +217,7 @@ class SPSPkgViewSet(SuperuserOnlySnippetViewSetMixin, CommonControlFieldViewSet)
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 10
+    filterset_class = SPSPkgFilterSet  # <--- Filtro customizado associado
 
     list_display = [
         "sps_pkg_name",
@@ -199,18 +231,40 @@ class SPSPkgViewSet(SuperuserOnlySnippetViewSetMixin, CommonControlFieldViewSet)
         "updated",
     ]
 
-    list_filter = [
-        "origin",
-        "registered_in_core",
-        "valid_texts",
-        "valid_components",
-        "is_public",
-    ]
-
+    # Obs: list_filter foi removido para evitar conflitos com o filterset_class
     search_fields = [
         "pid_v3",
         "sps_pkg_name",
     ]
+
+
+class ArticleProcFilterSet(django_filters.FilterSet):
+    has_sps_pkg = django_filters.BooleanFilter(
+        field_name='sps_pkg_id',
+        lookup_expr='isnull',
+        exclude=True,
+        label=_('Has SPS Package')
+    )
+    has_sps_pkg_article = django_filters.BooleanFilter(
+        field_name='sps_pkg__article',
+        lookup_expr='isnull',
+        exclude=True,
+        label=_('Has SPS Package Article')
+    )
+
+    class Meta:
+        model = ArticleProc
+        fields = [
+            'collection',
+            'pid_status',
+            'migration_status',
+            'xml_status',
+            'sps_pkg_status',
+            'qa_ws_status',
+            'public_ws_status',
+            'has_sps_pkg',
+            'has_sps_pkg_article',
+        ]
 
 
 class ArticleProcViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet):
@@ -221,9 +275,9 @@ class ArticleProcViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSe
     menu_order = 200
     add_to_settings_menu = False
     list_per_page = 10
-
     list_display = [
         "__str__",
+        "collection",
         "xml_status",
         "sps_pkg_status",
         "migration_status",
@@ -232,15 +286,7 @@ class ArticleProcViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSe
         "pid_status",
         "updated",
     ]
-    list_filter = [
-        "collection",
-        "pid_status",
-        "migration_status",
-        "xml_status",
-        "sps_pkg_status",
-        "qa_ws_status",
-        "public_ws_status",
-    ]
+    filterset_class = ArticleProcFilterSet
     search_fields = [
         "sps_pkg__pid_v3",
         "pid",
@@ -283,6 +329,118 @@ class ProcReportViewSet(TeamScopedSnippetViewSetMixin, CommonControlFieldViewSet
     ]
 
 
+class SuperuserOnlyPermissionPolicy(BasePermissionPolicy):
+    """
+    Relatórios de problemas são exclusivos de administradores: só
+    superusuários ativos veem o menu, a lista, o detalhe, o download e
+    podem gerar ou apagar relatórios.
+    """
+
+    def user_has_permission(self, user, action):
+        return bool(user.is_authenticated and user.is_active and user.is_superuser)
+
+    def user_has_any_permission(self, user, actions):
+        return self.user_has_permission(user, None)
+
+    def users_with_any_permission(self, actions):
+        return get_user_model().objects.filter(is_active=True, is_superuser=True)
+
+    def users_with_permission(self, action):
+        return self.users_with_any_permission([action])
+
+
+class ProblemReportIndexView(SnippetIndexView):
+    """
+    O botão "Add" vira "Gerar relatório" (situação atual, sob demanda).
+    Relatórios não são editáveis: o título leva à tela de detalhe (só
+    leitura, com o download) e a ação "Editar" não aparece.
+    """
+
+    add_item_label = _("Generate report")
+
+    def get_add_url(self):
+        if self.user_has_permission("view"):
+            return reverse("proc:generate_problem_report")
+
+    def get_edit_url(self, instance):
+        return None
+
+    def get_queryset(self):
+        # quem abre a lista vê como erro o que ficou "gerando" além do limite
+        ProblemReport.mark_stale()
+        return super().get_queryset()
+
+
+class ProblemReportCreateView(SnippetCreateView):
+    """Relatórios só são criados pela task; redireciona para o formulário."""
+
+    def dispatch(self, request, *args, **kwargs):
+        return redirect("proc:generate_problem_report")
+
+
+class ProblemReportEditView(SnippetEditView):
+    """Não há o que editar: redireciona para a tela de detalhe."""
+
+    def dispatch(self, request, *args, **kwargs):
+        return redirect("wagtailsnippets_proc_problemreport:inspect", kwargs["pk"])
+
+
+class ProblemReportInspectView(SnippetInspectView):
+    """Detalhe só leitura, sem o botão "Editar"."""
+
+    def get_edit_url(self):
+        return None
+
+
+class ProblemReportViewSet(SnippetViewSet):
+    model = ProblemReport
+
+    @property
+    def permission_policy(self):
+        return SuperuserOnlyPermissionPolicy(self.model)
+
+    index_view_class = ProblemReportIndexView
+    add_view_class = ProblemReportCreateView
+    edit_view_class = ProblemReportEditView
+    inspect_view_class = ProblemReportInspectView
+    menu_label = _("Problem reports")
+    inspect_view_enabled = True
+    menu_icon = "warning"
+    menu_order = 200
+    add_to_settings_menu = False
+    list_per_page = 50
+    list_display = [
+        "scope_label",
+        "status",
+        "coverage",
+        "total_items",
+        "total_categories",
+        "task_name",
+        "download",
+        "created",
+        "expires_at",
+    ]
+    list_filter = ["status", "task_name", "item_types"]
+    search_fields = ["scope_label", "task_name"]
+    inspect_view_fields = [
+        "download",
+        "status",
+        "notice",
+        "coverage",
+        "max_items",
+        "language",
+        "scope_label",
+        "item_types",
+        "total_items",
+        "total_categories",
+        "task_name",
+        "created",
+        "generated_at",
+        "expires_at",
+        "error",
+    ]
+
+
 class ProcessViewSetGroup(SnippetViewSetGroup):
     menu_label = _("Processing")
     menu_icon = "folder-open-inverse"
@@ -294,6 +452,7 @@ class ProcessViewSetGroup(SnippetViewSetGroup):
         SPSPkgViewSet,
         HTMLXMLViewSet,
         ProcReportViewSet,
+        ProblemReportViewSet,
     )
 
 
