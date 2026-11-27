@@ -27,7 +27,9 @@ def checker_case(request, db, django_user_model):
         issn_electronic="1234-5678",
         issn_print="8765-4321",
     )
-    journal = Journal.objects.create(creator=user, official_journal=official)
+    journal = Journal.objects.create(
+        creator=user, official_journal=official, core_synchronized=True
+    )
     journal_proc = JournalProc.objects.create(creator=user, journal=journal)
     if request.param == "journal":
         record = journal
@@ -63,6 +65,8 @@ def checker_case(request, db, django_user_model):
     # Catalog completeness is covered by proc; keep actual lookup and Proc records here.
     with patch.object(
         Journal, "is_complete", new_callable=PropertyMock, return_value=True
+    ), patch.object(
+        Journal, "missing_fields", new_callable=PropertyMock, return_value=[]
     ):
         yield SimpleNamespace(
             key=request.param,

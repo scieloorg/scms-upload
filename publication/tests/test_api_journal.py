@@ -421,7 +421,7 @@ def build_journal_proc():
 
     journal = MagicMock()
     journal.core_synchronized = False
-    journal.is_complete = False
+    journal.missing_fields = ["Logo URL"]
     journal.issn_print = "0102-311X"
     journal.issn_electronic = "1678-4464"
     proc.journal = journal
@@ -455,7 +455,7 @@ class TestPublishJournal(unittest.TestCase):
 
     def test_nao_sincroniza_com_core_quando_ja_sincronizado(self):
         self.journal_proc.journal.core_synchronized = True
-        self.journal_proc.journal.is_complete = True
+        self.journal_proc.journal.missing_fields = []
         mock_api_instance = self.mock_api_cls.return_value
         mock_api_instance.post_data.return_value = {"ok": True}
 

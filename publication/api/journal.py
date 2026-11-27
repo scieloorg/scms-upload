@@ -34,7 +34,7 @@ def publish_journal(journal_proc, api_data):
 
     journal = journal_proc.journal
 
-    force_update = not journal.is_complete
+    force_update = not journal.core_synchronized or journal.missing_fields
     if force_update:
         try:
             # tenta sincronizar os dados
