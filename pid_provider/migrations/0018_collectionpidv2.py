@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("collection", "0005_alter_websiteconfiguration_api_get_token_url_and_more"),
-        ("pid_provider", "0017_alter_pidproviderxmlregistration_event_status"),
+        ("pid_provider", "0017_remove_xmlurl_and_source_tasks"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
