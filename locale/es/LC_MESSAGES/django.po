@@ -5291,3 +5291,10 @@ msgstr "El paquete contiene una ruta de archivo no válida."
 
 msgid "Unsupported change type."
 msgstr "Tipo de cambio no permitido."
+#: upload/wagtail_hooks.py:693
+msgid "Error management"
+msgstr "Gestión de errores"
+
+#: article/templates/article/report/data_availability.html:43
+msgid "Clear"
+msgstr "Limpiar"
