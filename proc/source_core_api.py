@@ -82,7 +82,7 @@ class BaseDataChecker(ABC):
         """Consulta dados locais. Deve ser implementado pelas subclasses."""
 
     @abstractmethod
-    def is_updated(self, obj):
+    def is_local_or_remote(self, obj):
         """Verifica se registro está atualizado. Deve ser implementado pelas subclasses."""
     
     @abstractmethod
@@ -96,7 +96,7 @@ class BaseDataChecker(ABC):
             # 1. consulta dados locais
             try:
                 obj = self.get_local()
-                if self.is_updated(obj):
+                if self.is_local_or_remote(obj) == "local":
                     return obj
             except self.model.DoesNotExist:
                 pass
@@ -155,12 +155,16 @@ class JournalDataChecker(BaseDataChecker):
             self.journal_title, self.issn_electronic, self.issn_print
         )
 
-    def is_updated(self, obj):
-        if not obj.is_complete:
-            return False
+    def is_local_or_remote(self, obj):
+        if not obj.core_synchronized:
+            # core_synchronized = False força atualização
+            return "remote"
+        if obj.missing_fields:
+            # indica ausencia de campos relevantes para o site público
+            return "remote"
         if not JournalProc.objects.filter(journal=obj).exists():
-            return False
-        return True
+            return "remote"
+        return "local"
 
     def fetch_from_core(self, force_update=True):
         """Consulta dados remotos de journal e atualiza os dados locais."""
@@ -179,11 +183,12 @@ class JournalDataChecker(BaseDataChecker):
     def ensure_proc_exists(self, force_update):
         journal = self.get_or_fetch(force_update)
 
-        if JournalProc.objects.filter(
-            journal=journal,
-        ).exists():
+        if journal and JournalProc.objects.filter(journal=journal).exists():
             return journal
-        raise JournalProc.DoesNotExist(f"JournalProc does not exist: {journal}")
+
+        raise JournalProc.DoesNotExist(
+            f"JournalProc does not exist: {journal}"
+        )
 
 
 def fetch_and_create_journal(
@@ -315,12 +320,13 @@ def process_journal_result(
     journal.logo_url = result.get("url_logo")
     journal.submission_online_url = result.get("submission_online_url")
 
+    # Processa location -> contact_location
     loc_data = result.get("location") or {}
     if loc_data:
         city_name = loc_data.get("city_name")
         country_name = loc_data.get("country_name")
         if city_name or country_name:
-            journal.contact_location = Location.create_or_update(
+            contact_loc = Location.create_or_update(
                 user,
                 city_name=city_name,
                 state_name=loc_data.get("state_name"),
@@ -328,6 +334,7 @@ def process_journal_result(
                 country_name=country_name,
                 country_acronym=loc_data.get("country_acronym"),
             )
+            journal.contact_location = contact_loc
     journal.save()
 
     journal.journal_email.all().delete()
@@ -403,8 +410,6 @@ def process_journal_result(
         no_lang = []
 
     # Processa dados específicos do SciELO
-    journal_acron = journal.journal_acron
-
     scielo_journals = result.get("scielo_journal") or []
     if len(scielo_journals) == 0:
         raise ValueError(
@@ -451,7 +456,6 @@ def process_journal_result(
             migration_status=tracker_choices.PROGRESS_STATUS_DONE,
             force_update=force_update,
         )
-        journal_acron = journal_acron or item.get("journal_acron")
 
     if not collection:
         raise ValueError(
@@ -459,8 +463,6 @@ def process_journal_result(
                 journal
             )
         )
-    if journal.journal_acron != journal_acron:
-        journal.journal_acron = journal_acron
     journal.core_synchronized = True
     journal.save()
 
@@ -470,7 +472,6 @@ def process_journal_result(
     # - text_language (array)
     # - title_in_database (array)
     # - crossmark_policy (array)
-    # - acronym (root level field)
     # - other_titles
 
     return journal
@@ -508,10 +509,10 @@ class IssueDataChecker(BaseDataChecker):
         xml = ArticleMetaIssue(xmltree)
         return cls(journal, publication_year, xml.volume, xml.suppl, xml.number, user)
 
-    def is_updated(self, obj):
+    def is_local_or_remote(self, obj):
         if not IssueProc.objects.filter(issue=obj).exists():
-            return False
-        return True
+            return "remote"
+        return "local"
     
     def get_local(self):
         """Consulta dados locais de issue."""
@@ -554,9 +555,12 @@ class IssueDataChecker(BaseDataChecker):
         """
         issue = self.get_or_fetch(force_update)
 
-        if IssueProc.objects.filter(issue=issue).exists():
+        if issue and IssueProc.objects.filter(issue=issue).exists():
             return issue
-        raise IssueProc.DoesNotExist(f"IssueProc does not exist: {issue}")
+
+        raise IssueProc.DoesNotExist(
+            f"IssueProc does not exist: {issue}"
+        )
 
 
 def fetch_and_create_issues(journal, pub_year, volume, suppl, number, user):
@@ -645,12 +649,12 @@ def process_issue_result(user, journal, result):
 
     # Cria/atualiza o issue com todos os campos da API
     issue = Issue.create_or_update(
+        user,
         journal=journal,
         volume=result.get("volume"),
         supplement=result.get("supplement"),
         number=result.get("number"),
         publication_year=result.get("year"),
-        user=user,
         order=result.get("order"),
         issue_pid_suffix=result.get("issue_pid_suffix"),
         is_continuous_publishing_model=result.get("is_continuous_publishing_model"),
@@ -665,7 +669,6 @@ def process_issue_result(user, journal, result):
     if hasattr(issue, "month") and result.get("month"):
         issue.month = result.get("month")
         save = True
-
     if save:
         issue.save()
 

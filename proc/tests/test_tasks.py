@@ -1183,7 +1183,7 @@ class TaskCheckArticleWebpagesTest(TestCase):
             "USER", force_update=False
         )
         article.check_availability.assert_called_once_with(
-            "USER", collection_id=5, purpose="QA", force_update=False
+            "USER", collection_id=5, purpose="QA", force_update=False, timeout=10
         )
         self.assertEqual(article_proc.set_pid_status.call_count, 2)
         article_proc.set_pid_status.assert_any_call("USER", "CLASSIC_MATCHED")
