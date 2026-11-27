@@ -1,12 +1,13 @@
 import sys
 
-# from django.utils.translation import gettext_lazy as _
-from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre, get_xml_with_pre
+from django.db import transaction
+from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
 
 from core.utils.profiling_tools import (  # ajuste o import conforme sua estrutura
     profile_method,
 )
 from pid_provider.models import PidProviderXML
+from pid_provider.multi_collection import get_xml_collection_acron
 from tracker.models import UnexpectedEvent
 
 
@@ -27,6 +28,7 @@ class BasePidProvider:
         registered_in_core=None,
         caller=None,
         auto_solve_pid_conflict=None,
+        collection_acron=None,
     ):
         """
         Fornece e valida PIDs para documento XML, retornando dados completos de registro.
@@ -53,6 +55,12 @@ class BasePidProvider:
             Identificador do sistema chamador
         auto_solve_pid_conflict : bool, optional
             Resolve conflitos de PID automaticamente
+        collection_acron : str, optional
+            Acrônimo da coleção de origem do XML, usado quando o XML não a
+            informa (custom-meta), como na coleta de artigos do OPAC
+            (task_load_record_from_xml_url); necessário para registrar o pid
+            v2 e a versão do XML por coleção (CollectionPidV2) quando o
+            periódico está em mais de uma coleção
 
         Returns
         -------
@@ -68,6 +76,23 @@ class BasePidProvider:
               apply_xml_changes (se caller="core" e xml_changed=True)
         """
         self.caller = caller
+
+        # identifica a coleção de origem do XML (custom-meta): a do XML
+        # prevalece; collection_acron só completa a ausente, como na coleta
+        # de artigos do OPAC (task_load_record_from_xml_url), cujo XML pode
+        # não informar a coleção. No Upload / migração, a coleção já vem no
+        # XML (ver ArticleProc). No Core, o XML pode chegar sem a coleção,
+        # por exemplo, enviado (API) por versão do Upload anterior à inserção
+        # da coleção no XML: a coleção é identificada pelo PID (contido no
+        # pid v2) e pelo acrônimo do periódico; mais de uma coleção
+        # identificada é ambíguo e levanta exceção (ver
+        # get_xml_collection_acron)
+        if not xml_with_pre.collection:
+            collection_acron = collection_acron or get_xml_collection_acron(
+                xml_with_pre
+            )
+            if collection_acron:
+                xml_with_pre.collection = collection_acron
 
         registered = PidProviderXML.register(
             xml_with_pre,
@@ -100,6 +125,7 @@ class BasePidProvider:
         registered_in_core=None,
         caller=None,
         auto_solve_pid_conflict=True,
+        collection_acron=None,
     ):
         """
         Fornece / Valida PID para o XML em um arquivo compactado
@@ -121,6 +147,7 @@ class BasePidProvider:
                     registered_in_core=registered_in_core,
                     caller=caller,
                     auto_solve_pid_conflict=auto_solve_pid_conflict,
+                    collection_acron=collection_acron,
                 )
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -147,41 +174,113 @@ class BasePidProvider:
 
     @profile_method
     def provide_pid_for_xml_uri(
-        self, xml_uri, name, user, origin_date=None, force_update=None,
-        is_published=None, registered_in_core=None, detail=None,
-        auto_solve_pid_conflict=None, document_item=None, expected_pid_v3=None,
+        self,
+        xml_uri,
+        name,
+        user,
+        origin_date=None,
+        force_update=None,
+        is_published=None,
+        registered_in_core=None,
+        detail=None,
+        auto_solve_pid_conflict=None,
+        document_item=None,
+        expected_pid_v3=None,
+        collection_acron=None,
     ):
-        """Obtém o XML e confere o PID esperado sem persistir o controle da fonte."""
-        stage = "xml_fetch_failed"
+        """
+        Fornece / Valida PID de um XML disponível por um URI
+        
+        Obtém o XML, valida o PID v3 informado pela fonte e cria ou atualiza
+        PidProviderXML. Falhas são registradas em UnexpectedEvent.
+
+        Returns
+        -------
+            dict
+        """
         try:
             xml_with_pre = list(XMLWithPre.create(uri=xml_uri))[0]
-            stage = "pid_v3_mismatch"
-            if expected_pid_v3 and xml_with_pre.v3 != expected_pid_v3:
-                raise ValueError(
-                    f"PID v3 mismatch: expected={expected_pid_v3}, xml={xml_with_pre.v3}"
+        except Exception as e:
+            return self._handle_uri_error(
+                e,
+                "xml_fetch_failed",
+                xml_uri,
+                name,
+                user,
+                origin_date,
+                force_update,
+                is_published,
+                document_item,
+                expected_pid_v3,
+            )
+
+        if expected_pid_v3 and xml_with_pre.v3 != expected_pid_v3:
+            return self._handle_uri_error(
+                ValueError(
+                    f"PID v3 mismatch: counter_dict={expected_pid_v3}, "
+                    f"xml={xml_with_pre.v3}"
+                ),
+                "pid_v3_mismatch",
+                xml_uri,
+                name,
+                user,
+                origin_date,
+                force_update,
+                is_published,
+                document_item,
+                expected_pid_v3,
+            )
+
+        try:
+            with transaction.atomic():
+                response = self.provide_pid_for_xml_with_pre(
+                    xml_with_pre,
+                    name,
+                    user,
+                    origin_date=origin_date,
+                    force_update=force_update,
+                    is_published=is_published,
+                    origin=xml_uri,
+                    registered_in_core=registered_in_core,
+                    auto_solve_pid_conflict=auto_solve_pid_conflict,
+                    collection_acron=collection_acron,
                 )
 
-            stage = "pid_provider_xml_failed"
-            return self.provide_pid_for_xml_with_pre(
-                xml_with_pre, name, user, origin_date=origin_date,
-                force_update=force_update, is_published=is_published,
-                origin=xml_uri, registered_in_core=registered_in_core,
-                auto_solve_pid_conflict=auto_solve_pid_conflict,
-            )
-        except Exception as exc:
-            return self._handle_unexpected_error(
-                exc, xml_uri, name, user, origin_date, force_update,
-                is_published, document_item, stage=stage,
-                expected_pid_v3=expected_pid_v3,
+                error_msg = response.get("error_msg") or response.get(
+                    "error_message"
+                )
+                if response.get("error_type") or error_msg:
+                    raise ValueError(error_msg or response.get("error_type"))
+            return response
+        except Exception as e:
+            return self._handle_uri_error(
+                e,
+                "pid_provider_xml_failed",
+                xml_uri,
+                name,
+                user,
+                origin_date,
+                force_update,
+                is_published,
+                document_item,
+                expected_pid_v3,
             )
 
-    def _handle_unexpected_error(
-        self, exception, xml_uri, name, user, origin_date, force_update,
-        is_published, document_item, stage="unexpected_error", expected_pid_v3=None,
+    def _handle_uri_error(
+        self,
+        exception,
+        stage,
+        xml_uri,
+        name,
+        user,
+        origin_date,
+        force_update,
+        is_published,
+        document_item,
+        expected_pid_v3,
     ):
-        """Handle exception type c) - Unexpected error during processing"""
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        
+
         UnexpectedEvent.create(
             exception=exception,
             exc_traceback=exc_traceback,
@@ -189,7 +288,6 @@ class BasePidProvider:
             action="PidProvider.provide_pid_for_xml_uri",
             detail={
                 "operation": "PidProvider.provide_pid_for_xml_uri",
-                "exception_type": "unexpected_error",
                 "stage": stage,
                 "input": dict(
                     xml_uri=xml_uri,
@@ -203,13 +301,16 @@ class BasePidProvider:
                 ),
             },
         )
-        
-        return dict(
+
+        response = dict(
             error_msg=str(exception),
-            error_type=str(exc_type),
-            exc_value=str(exc_value),
-            exc_traceback=str(exc_traceback),
+            error_type=str(type(exception)),
         )
+        if exc_value is not None:
+            response["exc_value"] = str(exc_value)
+        if exc_traceback is not None:
+            response["exc_traceback"] = str(exc_traceback)
+        return response
 
     @classmethod
     @profile_method
