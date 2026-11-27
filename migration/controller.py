@@ -2,15 +2,14 @@ import logging
 import os
 import sys
 import traceback
-from copy import deepcopy
-from datetime import datetime, timezone
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from packtools.sps.models.article_and_subarticles import ArticleAndSubArticles
 from packtools.sps.models.v2.article_assets import ArticleAssets
 from packtools.sps.pid_provider.xml_sps_lib import XMLWithPre
+from scielo_classic_website import classic_ws
+from scielo_classic_website.iid2json.id_file import ClassicIdFile
 
 from article.models import Article
 from collection.models import Language
@@ -29,14 +28,15 @@ from journal.models import (
     Subject,
 )
 from location.models import Location
-from migration.models import IdFileRecord, JournalAcronIdFile, MigratedFile
-from scielo_classic_website import classic_ws
-from scielo_classic_website.iid2json.id2json3 import get_doc_records
+from migration.models import (
+    ClassicWebsiteConfiguration,
+    IdFileRecord,
+    JournalAcronIdFile,
+    MigratedArticle,
+    MigratedFile,
+)
 from tracker import choices as tracker_choices
 from tracker.models import UnexpectedEvent, format_traceback
-
-from .models import ClassicWebsiteConfiguration
-
 
 def get_classic_website_config(collection_acron):
     return ClassicWebsiteConfiguration.objects.get(collection__acron=collection_acron)
@@ -55,8 +55,12 @@ def create_or_update_journal(
     try:
         journal_proc_event = journal_proc.start(user, "create_or_update_journal")
         collection = journal_proc.collection
-        journal_data = journal_proc.migrated_data.data
 
+        migrated_data = journal_proc.migrated_data
+        if not migrated_data:
+            raise ValueError(f"Missing migrated_data for {journal_proc}")
+
+        journal_data = migrated_data.data
         # obtém classic website journal
         classic_website_journal = classic_ws.Journal(journal_data)
 
@@ -256,6 +260,10 @@ def create_or_update_journal(
             exc_traceback=exc_traceback,
         )
         raise e
+    # core_synchronized = True, inibe atualização via coleta do core.scielo.org,
+    # pois os dados entraram via migração
+    journal.core_synchronized = True
+    journal.save()
     return journal
 
 
@@ -310,25 +318,14 @@ def create_or_update_issue(
     if not journal_proc.journal:
         raise ValueError(f"Missing JournalProc.journal for {journal_proc}")
 
-    params = dict(
-        journal=journal_proc.journal,
-        publication_year=classic_website_issue.publication_year,
-        volume=classic_website_issue.volume,
-        number=classic_website_issue.number,
-        supplement=classic_website_issue.supplement,
-        user=user,
-        is_continuous_publishing_model=bool(
-            not classic_website_issue.number and not classic_website_issue.supplement
-        ),
-        total_documents=classic_website_issue.total_documents,
-        order=int(classic_website_issue.order[-4:]),
-        issue_pid_suffix=classic_website_issue.order[-4:],
-    )
+    kwargs = _get_issue_params(user, journal_proc.journal, classic_website_issue)
     issue = issue_proc.issue
     if issue:
-        issue.update(**params)
+        issue.update(**kwargs)
     else:
-        issue = Issue.create_or_update(**params)
+        issue = Issue.create_or_update(**kwargs)
+
+    _create_sections(user, issue, classic_website_issue)
 
     issue_proc.update(
         user=user,
@@ -338,7 +335,27 @@ def create_or_update_issue(
         migration_status=tracker_choices.PROGRESS_STATUS_DONE,
         force_update=force_update,
     )
+    return issue
 
+
+def _get_issue_params(user, journal, classic_website_issue):
+    return dict(
+        user=user,
+        journal=journal,
+        publication_year=classic_website_issue.publication_year,
+        volume=classic_website_issue.volume,
+        number=classic_website_issue.number,
+        supplement=classic_website_issue.supplement,
+        is_continuous_publishing_model=bool(
+            not classic_website_issue.number and not classic_website_issue.supplement
+        ),
+        total_documents=classic_website_issue.total_documents,
+        order=int(classic_website_issue.order[-4:]),
+        issue_pid_suffix=classic_website_issue.order[-4:],
+    )
+
+
+def _create_sections(user, issue, classic_website_issue):
     toc = TOC.create_or_update(
         user,
         issue,
@@ -367,7 +384,6 @@ def create_or_update_issue(
                 text=text,
             )
             TocSection.create_or_update(user, toc, section.get("code"), sec)
-    return issue
 
 
 def create_or_update_article(
@@ -384,6 +400,7 @@ def create_or_update_article(
         article_proc.sps_pkg,
         issue=article_proc.issue_proc.issue,
         journal=article_proc.issue_proc.journal_proc.journal,
+        collection=article_proc.collection,
     )
     article_proc.migrated_data.migration_status = tracker_choices.PROGRESS_STATUS_DONE
     article_proc.migration_status = tracker_choices.PROGRESS_STATUS_DONE
@@ -465,8 +482,13 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
             journal_acron,
             issue_folder,
         )
+        # o mesmo arquivo pode ser retornado mais de uma vez
+        # (ex.: arquivos de bases também encontrados como "asset");
+        # mantém o primeiro, que tem o tipo mais específico
+        processed_paths = set()
         for file in files_and_exceptions:
             exception = {}
+            original_path = None
             try:
                 if not file:
                     continue
@@ -477,6 +499,11 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                     exceptions.append(exception)
                     continue
 
+                original_path = file["relative_path"]
+                if original_path in processed_paths:
+                    continue
+                processed_paths.add(original_path)
+
                 component_type = check_component_type(file)
                 part = file.get("part")
 
@@ -484,7 +511,7 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                     MigratedFile.create_or_update(
                         user=user,
                         collection=collection,
-                        original_path=file["relative_path"],
+                        original_path=original_path,
                         source_path=file["path"],
                         component_type=component_type,
                         lang=file.get("lang"),
@@ -498,6 +525,7 @@ def migrate_issue_files(user, collection, journal_acron, issue_folder, force_upd
                 )
 
             except Exception as e:
+                exception["original_path"] = original_path
                 exception["error"] = str(e)
                 exception["type"] = str(type(e))
                 exceptions.append(exception)
@@ -572,15 +600,16 @@ class PkgZipBuilder:
             try:
                 if rendition.lang:
                     sps_filename = f"{self.sps_pkg_name}-{rendition.lang}.pdf"
-                    pdf_langs.add(rendition.lang)
+                    pdf_lang = rendition.lang
                 else:
                     sps_filename = f"{self.sps_pkg_name}.pdf"
-                    pdf_langs.add(xml_langs[0])
+                    pdf_lang = xml_langs[0]
+                pdf_langs.add(pdf_lang)
 
                 zf.write(rendition.file.path, arcname=sps_filename)
 
                 self.components[sps_filename] = {
-                    "lang": rendition.lang,
+                    "lang": pdf_lang,
                     "legacy_uri": rendition.original_href,
                     "component_type": "rendition",
                 }
@@ -706,7 +735,6 @@ def get_migrated_xml_with_pre(article_proc):
 
 def import_journal_acron_id_records(
     user,
-    article_proc_model,
     journal_proc,
     force_update,
 ):
@@ -738,31 +766,55 @@ def import_journal_acron_id_records(
             journal_acron + ".id",
         )
 
+        # raises FileNotFoundError (source_path)
         journal_id_file = JournalAcronIdFile.create_or_update(
             user=user,
             collection=collection,
             journal_acron=journal_acron,
             source_path=source_path,
-            force_update=force_update,
         )
 
-        if force_update or journal_id_file.data.get(
-            "id_file_record_need_to_be_updated"
-        ):
-            for item in get_bases_work_acron_id_file_records(
-                source_path,
-                classic_website,
-            ):
-                if item.get("exception"):
-                    exceptions.append(item.get("exception"))
-                    continue
-
-                item["force_update"] = force_update
-                IdFileRecord.create_or_update(
-                    user,
-                    journal_id_file,
-                    **item,
+        if journal_id_file.has_changes(force_update=force_update):
+            registered = None
+            if not force_update:
+                # (PID, data de atualização) dos artigos já migrados; os
+                # demais itens são lidos e IdFileRecord.create_or_update só
+                # atualiza os que mudaram
+                registered = set(
+                    MigratedArticle.objects.filter(
+                        collection=collection,
+                        pid__startswith=f"S{journal_proc.pid}",
+                    ).values_list("pid", "isis_updated_date")
                 )
+            try:
+                # lê a cópia guardada por create_or_update
+                for item in get_bases_work_acron_id_file_records(
+                    journal_id_file.file.path,
+                    classic_website,
+                    registered=registered,
+                ):
+                    if item.get("exception"):
+                        # falha em registro individual: não impede a
+                        # marcação do arquivo como lido
+                        exceptions.append(item.get("exception"))
+                        continue
+
+                    item["force_update"] = force_update
+                    IdFileRecord.create_or_update(
+                        user,
+                        journal_id_file,
+                        **item,
+                    )
+            except Exception:
+                # leitura incompleta: não marca como lido; os registros já
+                # carregados (todo=True) podem ser processados
+                tb = traceback.format_exc()
+                message = str(
+                    _("Incomplete reading of acron.id; it will be read again in the next execution")
+                )
+            else:
+                # o arquivo só é marcado como lido se for lido completamente
+                journal_id_file.mark_as_read(user)
         else:
             message = str(_("IdFileRecord is already up-to-date with acron.id"))
 
@@ -796,49 +848,67 @@ def import_journal_acron_id_records(
 
 
 def get_bases_work_acron_id_file_records(
-    source_path, classic_website,
+    source_path, classic_website, registered=None
 ):
-    for item in get_doc_records(source_path):
+    """
+    Com registered (pares PID, data de atualização já registrados), somente
+    os itens novos ou atualizados, independentemente da ordem dos registros
+    no arquivo (o acron.id concatena arquivos .id) e de leitura
+    interrompida. Itens sem data (incompletos) não são lidos.
+    item.pid e item.date não dependem da conversão dos registros.
+    """
+    paths = classic_website.classic_website_paths
+    id_file = ClassicIdFile(
+        "artigo",
+        source_path,
+        p_records_base_paths=[paths.bases_work_path, paths.bases_path],
+    )
+    for item in id_file.items():
+        if registered and (not item.date or (item.pid, item.date) in registered):
+            continue
         try:
-            issue_id = item.get("issue_id")
-            doc_id = item.get("doc_id")
-
-            if doc_id:
+            if item.kind == "document":
+                # records: registros do acron.id e, se o artigo não tem
+                # registros "p" no acron.id, os de bases-work/artigo/p/<pid>
+                # ou bases/artigo/p/<pid>, se existirem
                 yield dict(
                     item_type="article",
-                    item_pid=doc_id,
-                    data=item["doc_data"],
+                    item_pid=item.pid,
+                    data=item.records,
                 )
-                try:
-                    # se houver bases-work/p/<pid>, obtém os registros de parágrafo
-                    ign_pid, p_records = classic_website.get_p_records(doc_id)
-                    p_records = list(p_records)
-                    if p_records:
-                        # adiciona registros p aos registros do artigo
-                        # info["external_p_records_count"] = len(p_records)
-                        yield dict(
-                            item_type="paragraph",
-                            item_pid=doc_id,
-                            data=p_records,
-                        )
-                except FileNotFoundError:
-                    # é aceitável que bases-work/p/<pid>....id não exista
-                    pass
 
-            elif issue_id:
+            elif item.kind == "issue":
                 yield dict(
                     item_type="issue",
-                    item_pid=issue_id,
-                    data=item["issue_data"],
+                    item_pid=item.pid,
+                    data=item.data,
                 )
 
         except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
             yield dict(
-                item_pid=doc_id or issue_id,
+                item_type="exception",
+                item_pid=item.pid,
                 exception=str(e)
             )
 
-
-def id_file_has_changes(user, collection, id_path, force_update):
-    return MigratedFile.has_changes(user, collection, id_path, force_update)
+    # lotes quebrados (ex.: "o" sem "h", "h"... sem "o"): não são documentos;
+    # são armazenados separados, para auditoria
+    for batch in id_file.broken_batches():
+        try:
+            yield dict(
+                item_type="broken",
+                item_pid=(batch.pid or f"MFN{batch.mfn}")[:23],
+                data=dict(
+                    record_types="".join(t or "" for t in batch.record_types),
+                    mfn=batch.mfn,
+                    last_mfn=batch.last_mfn,
+                    offset=batch.offset,
+                    records=batch.main_records,
+                ),
+            )
+        except Exception as e:
+            yield dict(
+                item_type="exception",
+                item_pid=batch.pid,
+                exception=str(e)
+            )
